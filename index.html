@@ -147,6 +147,26 @@
   </div>
 
 <script>
+  // ============ FUNCIONES CORREGIDAS PARA EL SLIDER Y INPUT PWM ============
+  function onSliderChange(val) {
+    document.getElementById('pot_input').value = val;
+    enviarPot(val);
+  }
+  function onInputChange(val) {
+    val = (val === "" || isNaN(val)) ? 0 : Math.max(0, Math.min(100, Number(val)));
+    document.getElementById('pot_slider').value = val;
+    enviarPot(val);
+  }
+  window.onSliderChange = onSliderChange;
+  window.onInputChange = onInputChange;
+
+  function enviarPot(val) {
+    if (window.client) {
+      client.publish("taller/motor/potencia", val.toString());
+      document.getElementById('status').textContent = 'PWM enviado: ' + val + ' %';
+    }
+  }
+
   // Calibración báscula 1
   const BASCULA1_OFFSET = 820000;
   const BASCULA1_FACTOR = 5000;

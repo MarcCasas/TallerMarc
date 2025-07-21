@@ -51,7 +51,6 @@
     <button class="tab" onclick="showTab(1)">Configuración</button>
     <button class="tab" onclick="showTab(2)">Horno</button>
   </div>
-
   <!-- PESTAÑA 1: MOTOR -->
   <div class="panel active" id="panel0">
     <div class="mainflex">
@@ -90,8 +89,8 @@
   <!-- PESTAÑA 2: Configuración -->
   <div class="panel" id="panel1">
     <h2>Configuración</h2>
-    <div>Broker MQTT: <input id="broker_ip" value="ws://192.168.0.164:9001" size="25"> <button onclick="reconectar()">Reconectar</button></div>
-    <div style="margin-top:1rem;">Puedes cambiar la IP si tu Mosquitto está en otro PC/puerto.</div>
+    <div>Broker MQTT: <input id="broker_ip" value="wss://TU_HOSTNAME.s2.eu.hivemq.cloud:8884/mqtt" size="45"> <button onclick="reconectar()">Reconectar</button></div>
+    <div style="margin-top:1rem;">Puedes cambiar el broker MQTT si lo necesitas (por ejemplo para pruebas en local).</div>
   </div>
 
   <!-- PESTAÑA 3: HORNO -->
@@ -232,7 +231,11 @@
   }
 
   // MQTT
-  let BROKER = document.getElementById('broker_ip').value;
+  // === ESTO DEBES CAMBIAR POR TUS DATOS REALES DE HIVEMQ CLOUD ===
+  let BROKER = "wss://TU_HOSTNAME.s2.eu.hivemq.cloud:8884/mqtt"; // PON TU HOSTNAME
+  const MQTT_USERNAME = "TU_USUARIO";   // PON TU USUARIO
+  const MQTT_PASSWORD = "TU_CONTRASEÑA"; // PON TU CONTRASEÑA
+
   let client = null;
   const TOPIC_DATOS = "taller/motor/datos";
   const TOPIC_POTENCIA = "taller/motor/potencia";
@@ -378,7 +381,7 @@
     hornoCicloActivo = true;
     hornoTempMaxActual = Math.max(...curva);
 
-    saveHornoState(); // <-- Guardar estado cada vez que generas curva
+    saveHornoState();
   }
 
   function hornoInitChart() {
@@ -414,9 +417,8 @@
     let rampUp = Number(document.getElementById('horno_ramp_up').value);
     let hold = Number(document.getElementById('horno_hold').value);
     let rampDown = Number(document.getElementById('horno_ramp_down').value);
-    // Usa la temperatura inicial recibida
     generarCurvaHorno(tmax, rampUp, hold, rampDown, hornoTempIni);
-    setTimeout(hornoInitChart, 250); // asegura canvas visible
+    setTimeout(hornoInitChart, 250);
     let msg = {
       cmd: "start",
       t_ini: hornoTempIni,
@@ -426,7 +428,7 @@
       ramp_down: rampDown
     };
     client.publish(TOPIC_HORNO_CMD, JSON.stringify(msg));
-    saveHornoState(); // <-- Guardar estado después de iniciar ciclo
+    saveHornoState();
   }
 
   function hornoUpdateCharts(datos) {
@@ -434,7 +436,6 @@
     let idx = Math.round((datos.t_elapsed || 0) / HORNO_DT);
     idx = Math.max(0, Math.min(idx, hornoCurvaReal.length - 1));
     hornoCurvaReal[idx] = datos.temp ?? null;
-    // Interpola
     if (idx > 0 && hornoCurvaReal[idx-1] == null && datos.temp != null) {
       hornoCurvaReal[idx-1] = datos.temp;
     }
@@ -442,9 +443,8 @@
       hornoChart.data.datasets[1].data = hornoCurvaReal;
       hornoChart.update('none');
     }
-    // Indicador de estado
     showEstado(datos.fase || "parado");
-    saveHornoState(); // <-- Guardar estado después de actualizar datos reales
+    saveHornoState();
   }
 
   function pausarHorno() { client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "pause"})); }
@@ -452,12 +452,17 @@
   function pararHorno() {
     client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "stop"}));
     hornoTempIni = null;
-    clearHornoState(); // <-- Borra el estado al parar
+    clearHornoState();
   }
 
   function conectarMQTT() {
     if (client) client.end(true);
-    client = mqtt.connect(BROKER);
+
+    client = mqtt.connect(BROKER, {
+      username: MQTT_USERNAME,
+      password: MQTT_PASSWORD
+    });
+
     client.on('connect', () => {
       document.getElementById('status').textContent = "MQTT conectado";
       client.subscribe(TOPIC_DATOS);
@@ -535,5 +540,3 @@
 </script>
 </body>
 </html>
-
-

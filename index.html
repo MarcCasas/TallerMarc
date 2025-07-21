@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel Taller IoT</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #23252a; color: #e2e2e2; margin: 0; }
+    .tabs { display: flex; background: #18191c; }
+    .tab { padding: 1rem 2rem; cursor: pointer; background: #18191c; border: none; color: #aaa; font-size: 1.1rem;}
+    .tab.active { background: #23252a; color: #fff; border-bottom: 2px solid #59f;}
+    .mainflex { display: flex; flex-wrap: wrap; max-width: 1600px; margin: auto; }
+    .col { flex: 1 1 340px; min-width: 300px; padding: 2rem; }
+    .col-left { max-width: 420px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    h2 { margin-top: 0; }
+    .row { margin: 1.2rem 0; }
+    .label { width: 120px; display: inline-block; font-weight: bold; }
+    .value { font-family: monospace; color: #fff; }
+    .slider { width: 100%; }
+    #pot_input { margin-left: 12px; border-radius: 6px; border: none; padding: 5px; width: 58px; font-size:1.05em; }
+    button { margin-top: 1rem; width: 100%; padding: 0.7rem; border: none; background: #59f; color: #fff; border-radius: 6px; font-size: 1.1rem; }
+    #status { font-size: 0.96rem; margin-top: 2rem; color: #8f8; }
+    .graf { background: #1b1c20; border-radius: 12px; margin: 1.5rem 0; padding: 1rem; height: 480px; }
+    #hornoChart { width: 99% !important; height: 450px !important; }
+    @media (max-width: 900px) {
+      .mainflex { flex-direction: column; }
+      .col { max-width: 100% !important; }
+    }
+    #pwm_actual { color: #aaa; font-size:0.98em; margin-top:4px;}
+    .logBtns { margin-top: 2em; }
+    .logBtns input { font-size: 1em; border-radius: 4px; border: none; padding: 4px 7px; margin-right: 0.5em; }
+    .logBtns button { width:auto; margin-right: 1em; margin-top: 0.3em;}
+    #logStatus { color: #fff; font-size: 0.98em;}
+    #horno_estado {
+      font-size: 2.4em; margin-bottom: 1.1em; text-align: center; font-weight: bold;
+      border-radius: 12px; padding: 0.2em 0; box-shadow: 0 0 12px #4444;
+      letter-spacing: 2px;
+    }
+    #horno_estado.en-marcha { color: #0f0; background: #122; border: 2px solid #2d2; }
+    #horno_estado.pausado  { color: #fd0; background: #220; border: 2px solid #bb2; }
+    #horno_estado.parado   { color: #f33; background: #211; border: 2px solid #f55; }
+    .compact { margin: 0.6em 0; }
+  </style>
+</head>
+<body>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab(0)">Motor Thrust/Corriente</button>
+    <button class="tab" onclick="showTab(1)">Configuración</button>
+    <button class="tab" onclick="showTab(2)">Horno</button>
+  </div>
+
+  <!-- PESTAÑA 1: MOTOR -->
+  <div class="panel active" id="panel0">
+    <div class="mainflex">
+      <div class="col col-left">
+        <h2>Test Motor</h2>
+        <div class="row"><span class="label">Empuje (N):</span> <span id="thrust" class="value">--</span></div>
+        <div class="row"><span class="label">Corriente (A):</span> <span id="corriente" class="value">--</span></div>
+        <div class="row"><span class="label">PWM (%):</span> <span id="potencia" class="value">--</span></div>
+        <div class="row"><span class="label">PWM μs:</span> <span id="pwmus" class="value">--</span></div>
+        <hr>
+        <div>
+          <label class="label" for="pot_slider">PWM (%)</label>
+          <input type="range" min="0" max="100" value="0" id="pot_slider" class="slider" oninput="onSliderChange(this.value)">
+          <input type="number" min="0" max="100" value="0" id="pot_input" oninput="onInputChange(this.value)">
+          <div id="pwm_actual">PWM actual: <span id="pot_esp">--</span> %</div>
+        </div>
+        <div class="logBtns">
+          <input id="logFileName" value="log_motor" title="Nombre del archivo">
+          <button id="startBtn" onclick="startLogging()">Iniciar Logging</button>
+          <button id="stopBtn" onclick="stopLogging()" disabled>Parar y Descargar</button>
+          <span id="logStatus"></span>
+        </div>
+        <div id="status"></div>
+      </div>
+      <div class="col">
+        <div class="graf">
+          <canvas id="corrienteChart"></canvas>
+        </div>
+        <div class="graf">
+          <canvas id="thrustChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PESTAÑA 2: Configuración -->
+  <div class="panel" id="panel1">
+    <h2>Configuración</h2>
+    <div>Broker MQTT: <input id="broker_ip" value="ws://192.168.0.164:9001" size="25"> <button onclick="reconectar()">Reconectar</button></div>
+    <div style="margin-top:1rem;">Puedes cambiar la IP si tu Mosquitto está en otro PC/puerto.</div>
+  </div>
+
+  <!-- PESTAÑA 3: HORNO -->
+  <div class="panel" id="panel2">
+    <div class="mainflex">
+      <div class="col col-left">
+        <h2>Monitor y Control Horno</h2>
+        <div id="horno_estado" class="parado">PARADO</div>
+        <form id="form_horno" onsubmit="return false;">
+          <div class="row compact">
+            <span class="label">Temp. máx (°C):</span>
+            <input type="number" id="horno_tmax" value="120" min="30" max="200" step="1">
+          </div>
+          <div class="row compact">
+            <span class="label">Subida (°C/min):</span>
+            <input type="number" id="horno_ramp_up" value="2" min="0.1" max="10" step="0.1">
+          </div>
+          <div class="row compact">
+            <span class="label">Hold (min):</span>
+            <input type="number" id="horno_hold" value="30" min="1" max="300" step="1">
+          </div>
+          <div class="row compact">
+            <span class="label">Bajada (°C/min):</span>
+            <input type="number" id="horno_ramp_down" value="2" min="0.1" max="10" step="0.1">
+          </div>
+          <div class="row compact">
+            <button type="button" onclick="iniciarHorno()">Iniciar ciclo</button>
+            <button type="button" onclick="pausarHorno()">Pausar</button>
+            <button type="button" onclick="reanudarHorno()">Reanudar</button>
+            <button type="button" onclick="pararHorno()">Parar</button>
+          </div>
+        </form>
+        <hr>
+        <div class="row compact"><span class="label">Temp. real:</span> <span id="horno_temp" class="value">--</span> °C</div>
+        <div class="row compact"><span class="label">Setpoint:</span> <span id="horno_setpoint" class="value">--</span> °C</div>
+        <div class="row compact"><span class="label">Ciclo:</span> <span id="horno_fase" class="value">--</span></div>
+        <div class="row compact"><span class="label">Duty SSR1:</span> <span id="horno_ssr1" class="value">--</span> %</div>
+        <div class="row compact"><span class="label">Duty SSR2:</span> <span id="horno_ssr2" class="value">--</span> %</div>
+        <div class="row compact"><span class="label">t transcurrido:</span> <span id="horno_t_elapsed" class="value">--</span> min</div>
+        <div class="row compact"><span class="label">t total:</span> <span id="horno_t_total" class="value">--</span> min</div>
+      </div>
+      <div class="col">
+        <div class="graf">
+          <canvas id="hornoChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Calibración báscula 1
+  const BASCULA1_OFFSET = 820000; // <-- Ajusta a tu offset real
+  const BASCULA1_FACTOR = 5000;   // <-- Ajusta a tu factor real
+
+  function showTab(n) {
+    document.querySelectorAll('.tab').forEach((tab, i) => tab.classList.toggle('active', i===n));
+    document.querySelectorAll('.panel').forEach((panel, i) => panel.classList.toggle('active', i===n));
+  }
+
+  // PWM control motor
+  function enviarPot(val) {
+    client.publish(TOPIC_POTENCIA, val.toString());
+    document.getElementById('status').textContent = 'PWM enviado: ' + val + ' %';
+  }
+  function onSliderChange(val) {
+    document.getElementById('pot_input').value = val;
+    enviarPot(val);
+  }
+  function onInputChange(val) {
+    val = (val === "" || isNaN(val)) ? 0 : Math.max(0, Math.min(100, Number(val)));
+    document.getElementById('pot_slider').value = val;
+    enviarPot(val);
+  }
+
+  // Gráficas Motor
+  const N = 60;
+  const corrienteChart = new Chart(document.getElementById('corrienteChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: Array(N).fill(""),
+      datasets: [{
+        label: 'Corriente (A)',
+        data: Array(N).fill(null),
+        borderWidth: 2,
+        borderColor: '#4cf',
+        backgroundColor: '#4cf4',
+        pointRadius: 0,
+        fill: true,
+        tension: 0.25
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        x: { display: false },
+        y: { min: 0, max: 60, ticks: { color: "#fff" }, title: { display: true, text: 'A', color: "#fff" } }
+      },
+      plugins: { legend: { labels: { color: "#fff" } } }
+    }
+  });
+
+  const thrustChart = new Chart(document.getElementById('thrustChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: Array(N).fill(""),
+      datasets: [{
+        label: 'Thrust (N)',
+        data: Array(N).fill(null),
+        borderWidth: 2,
+        borderColor: '#fb6',
+        backgroundColor: '#fb62',
+        pointRadius: 0,
+        fill: true,
+        tension: 0.25
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        x: { display: false },
+        y: { min: 0, max: 10, ticks: { color: "#fff" }, title: { display: true, text: 'N', color: "#fff" } }
+      },
+      plugins: { legend: { labels: { color: "#fff" } } }
+    }
+  });
+
+  function updateCharts(corriente, thrustN) {
+    let dataC = corrienteChart.data.datasets[0].data;
+    dataC.push(corriente);
+    if (dataC.length > N) dataC.shift();
+    corrienteChart.update('none');
+    let dataT = thrustChart.data.datasets[0].data;
+    dataT.push(thrustN);
+    if (dataT.length > N) dataT.shift();
+    thrustChart.update('none');
+  }
+
+  // MQTT
+  let BROKER = document.getElementById('broker_ip').value;
+  let client = null;
+  const TOPIC_DATOS = "taller/motor/datos";
+  const TOPIC_POTENCIA = "taller/motor/potencia";
+  const TOPIC_BASCULAS = "taller/basculas/datos";
+  const TOPIC_HORNO_DATOS = "taller/horno/datos";
+  const TOPIC_HORNO_CMD = "taller/horno/consigna";
+
+  let logging = false;
+  let logData = [];
+  let logStartTime = null;
+  let ultimoThrustN = null;
+
+  function startLogging() {
+    logging = true;
+    logData = [];
+    logStartTime = Date.now();
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+    document.getElementById('logStatus').textContent = 'Logging...';
+  }
+
+  function stopLogging() {
+    logging = false;
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+    document.getElementById('logStatus').textContent = 'Generando CSV...';
+    if (logData.length === 0) {
+      document.getElementById('logStatus').textContent = 'Sin datos que guardar.';
+      return;
+    }
+    const sep = ";";
+    let csv = ["segundos", "corriente", "thrust", "pwm_pct"].join(sep) + "\n";
+    for (const row of logData) {
+      csv += row.join(sep) + "\n";
+    }
+    const blob = new Blob([csv], {type: 'text/csv'});
+    let name = document.getElementById('logFileName').value.replace(/[^a-zA-Z0-9_\-]/g, "_");
+    if(!name) name = "log";
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      document.getElementById('logStatus').textContent = 'Descarga completada.';
+    }, 100);
+  }
+
+  function reconectar() {
+    BROKER = document.getElementById('broker_ip').value;
+    conectarMQTT();
+  }
+
+  // ========= HORNO: ESCALA FIJA, ESTADO, Y REAL CONTINUA =========
+  const HORNO_DT = 0.25;
+  let hornoCurvaConsigna = [];
+  let hornoCurvaReal = [];
+  let hornoLabels = [];
+  let hornoTtotal = 0; // segundos
+  let hornoChart = null;
+  let hornoCicloActivo = false;
+  let hornoTempMaxActual = 150; // default
+
+  // --------- NUEVO: Temperatura inicial dinámica ---------
+  let hornoTempIni = null; // Guarda la temperatura inicial del horno
+
+  // --------- NUEVO: GUARDAR Y RECUPERAR ESTADO EN LOCALSTORAGE ---------
+  function saveHornoState() {
+    const state = {
+      hornoCurvaConsigna,
+      hornoCurvaReal,
+      hornoLabels,
+      hornoTempIni,
+      hornoTtotal,
+      hornoCicloActivo,
+      hornoTempMaxActual
+    };
+    localStorage.setItem('hornoState', JSON.stringify(state));
+  }
+
+  function loadHornoState() {
+    const saved = localStorage.getItem('hornoState');
+    if (saved) {
+      try {
+        const state = JSON.parse(saved);
+        hornoCurvaConsigna = state.hornoCurvaConsigna || [];
+        hornoCurvaReal = state.hornoCurvaReal || [];
+        hornoLabels = state.hornoLabels || [];
+        hornoTempIni = state.hornoTempIni || null;
+        hornoTtotal = state.hornoTtotal || 0;
+        hornoCicloActivo = state.hornoCicloActivo || false;
+        hornoTempMaxActual = state.hornoTempMaxActual || 150;
+        if(hornoCurvaConsigna.length > 0 && hornoLabels.length > 0) {
+          setTimeout(hornoInitChart, 100);
+        }
+      } catch(e) { console.log("Error al cargar estado horno:", e); }
+    }
+  }
+
+  function clearHornoState() {
+    localStorage.removeItem('hornoState');
+  }
+
+  function showEstado(estado) {
+    const est = document.getElementById("horno_estado");
+    est.className = "";
+    if (estado === "subida" || estado === "hold" || estado === "bajada" || estado === "reanudar") {
+      est.classList.add("en-marcha");
+      est.textContent = "EN MARCHA";
+    } else if (estado === "pausa" || estado === "pausado") {
+      est.classList.add("pausado");
+      est.textContent = "PAUSADO";
+    } else {
+      est.classList.add("parado");
+      est.textContent = "PARADO";
+    }
+  }
+
+  function generarCurvaHorno(tempMax, rampUp, hold, rampDown, t_ini = 25) {
+    let curva = [], tiempos = [];
+    let dt = HORNO_DT, cur_temp = t_ini, t = 0;
+    let tUp = (tempMax - t_ini) / rampUp * 60, tHold = hold * 60, tDown = (tempMax - t_ini) / rampDown * 60;
+    let tTotal = tUp + tHold + tDown;
+    let pasosUp = Math.round(tUp / dt);
+    for (let i = 0; i < pasosUp; ++i, t += dt) {
+      cur_temp += rampUp / 60 * dt;
+      curva.push(cur_temp); tiempos.push(t);
+    }
+    for (let i = 0; i < Math.round(tHold / dt); ++i, t += dt) {
+      curva.push(tempMax); tiempos.push(t);
+    }
+    for (let i = 0; i < Math.round(tDown / dt); ++i, t += dt) {
+      tempMax -= rampDown / 60 * dt;
+      curva.push(tempMax); tiempos.push(t);
+    }
+    hornoLabels = tiempos.map(v => (v / 60).toFixed(2));
+    hornoCurvaConsigna = curva;
+    hornoCurvaReal = Array(curva.length).fill(null);
+    hornoTtotal = Math.round(tTotal);
+    hornoCicloActivo = true;
+    hornoTempMaxActual = Math.max(...curva);
+
+    saveHornoState(); // <-- Guardar estado cada vez que generas curva
+  }
+
+  function hornoInitChart() {
+    if (hornoChart) hornoChart.destroy();
+    const ctx = document.getElementById('hornoChart').getContext('2d');
+    hornoChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: hornoLabels,
+        datasets: [
+          { label: 'Consigna (°C)', data: hornoCurvaConsigna, borderWidth: 2, borderColor: '#44f', backgroundColor: '#44f4', pointRadius: 0, fill: false, tension: 0.1 },
+          { label: 'Temperatura real (°C)', data: hornoCurvaReal, borderWidth: 5, borderColor: '#f44', backgroundColor: '#f442', pointRadius: 0, fill: false, tension: 0.1 }
+        ]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          x: { display: true, title: {display: true, text: "Tiempo (min)", color:"#fff"}, ticks: {color:"#fff"} },
+          y: { min: 0, max: Math.ceil(hornoTempMaxActual*1.5), ticks: { color: "#fff" }, title: { display: true, text: '°C', color: "#fff" } }
+        },
+        plugins: { legend: { labels: { color: "#fff" } } }
+      }
+    });
+  }
+
+  function iniciarHorno() {
+    if (hornoTempIni === null) {
+      alert("Esperando la temperatura inicial del horno...");
+      return;
+    }
+    let tmax = Number(document.getElementById('horno_tmax').value);
+    let rampUp = Number(document.getElementById('horno_ramp_up').value);
+    let hold = Number(document.getElementById('horno_hold').value);
+    let rampDown = Number(document.getElementById('horno_ramp_down').value);
+    // Usa la temperatura inicial recibida
+    generarCurvaHorno(tmax, rampUp, hold, rampDown, hornoTempIni);
+    setTimeout(hornoInitChart, 250); // asegura canvas visible
+    let msg = {
+      cmd: "start",
+      t_ini: hornoTempIni,
+      t_max: tmax,
+      ramp_up: rampUp,
+      hold: hold,
+      ramp_down: rampDown
+    };
+    client.publish(TOPIC_HORNO_CMD, JSON.stringify(msg));
+    saveHornoState(); // <-- Guardar estado después de iniciar ciclo
+  }
+
+  function hornoUpdateCharts(datos) {
+    if (!hornoCicloActivo || hornoCurvaReal.length === 0 || typeof datos.t_elapsed === "undefined") return;
+    let idx = Math.round((datos.t_elapsed || 0) / HORNO_DT);
+    idx = Math.max(0, Math.min(idx, hornoCurvaReal.length - 1));
+    hornoCurvaReal[idx] = datos.temp ?? null;
+    // Interpola
+    if (idx > 0 && hornoCurvaReal[idx-1] == null && datos.temp != null) {
+      hornoCurvaReal[idx-1] = datos.temp;
+    }
+    if (hornoChart) {
+      hornoChart.data.datasets[1].data = hornoCurvaReal;
+      hornoChart.update('none');
+    }
+    // Indicador de estado
+    showEstado(datos.fase || "parado");
+    saveHornoState(); // <-- Guardar estado después de actualizar datos reales
+  }
+
+  function pausarHorno() { client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "pause"})); }
+  function reanudarHorno() { client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "resume"})); }
+  function pararHorno() {
+    client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "stop"}));
+    hornoTempIni = null;
+    clearHornoState(); // <-- Borra el estado al parar
+  }
+
+  function conectarMQTT() {
+    if (client) client.end(true);
+    client = mqtt.connect(BROKER);
+    client.on('connect', () => {
+      document.getElementById('status').textContent = "MQTT conectado";
+      client.subscribe(TOPIC_DATOS);
+      client.subscribe(TOPIC_BASCULAS);
+      client.subscribe(TOPIC_HORNO_DATOS);
+    });
+    client.on('reconnect', () => { document.getElementById('status').textContent = "Reconectando..."; });
+    client.on('offline', () => { document.getElementById('status').textContent = "MQTT desconectado"; });
+    client.on('error', err => { document.getElementById('status').textContent = 'Error: ' + err; });
+    client.on('message', (topic, message) => {
+      // MOTOR
+      if(topic === TOPIC_DATOS) {
+        try {
+          const datos = JSON.parse(message);
+          document.getElementById('corriente').textContent = datos.corriente ?? '--';
+          document.getElementById('potencia').textContent = datos.potencia_pct ?? '--';
+          document.getElementById('pwmus').textContent = datos.pwm_us ?? '--';
+          document.getElementById('pot_esp').textContent = datos.potencia_pct ?? '--';
+          let thrustVal = ultimoThrustN;
+          if (!isNaN(datos.corriente) && !isNaN(thrustVal)) {
+            updateCharts(Number(datos.corriente), Number(thrustVal));
+          }
+          if (logging) {
+            const t = ((Date.now() - logStartTime) / 1000).toFixed(2);
+            const corriente = (typeof datos.corriente === 'number') ? datos.corriente : "";
+            const pwm = (typeof datos.potencia_pct === 'number') ? datos.potencia_pct : "";
+            logData.push([t, corriente, thrustVal, pwm]);
+            document.getElementById('logStatus').textContent = `Logging... (${logData.length} muestras)`;
+          }
+        } catch (e) {
+          document.getElementById('status').textContent = "Error en datos MQTT (motor)";
+        }
+      }
+      // BASCULAS
+      if(topic === TOPIC_BASCULAS) {
+        try {
+          const datos = JSON.parse(message);
+          if ('raw1' in datos) {
+            let kg = (datos.raw1 - BASCULA1_OFFSET) / BASCULA1_FACTOR;
+            let thrustN = kg * 9.81;
+            thrustN = Math.max(0, thrustN);
+            document.getElementById('thrust').textContent = isNaN(thrustN) ? '--' : thrustN.toFixed(2);
+            ultimoThrustN = thrustN;
+          }
+        } catch (e) {
+          document.getElementById('status').textContent = "Error en datos MQTT (bascula)";
+        }
+      }
+      // HORNO
+      if(topic === TOPIC_HORNO_DATOS) {
+        try {
+          const datos = JSON.parse(message);
+          document.getElementById('horno_temp').textContent = datos.temp ?? "--";
+          document.getElementById('horno_setpoint').textContent = datos.setpoint ?? "--";
+          document.getElementById('horno_fase').textContent = datos.fase ?? "--";
+          document.getElementById('horno_ssr1').textContent = datos.ssr1_duty ?? "--";
+          document.getElementById('horno_ssr2').textContent = datos.ssr2_duty ?? "--";
+          document.getElementById('horno_t_elapsed').textContent = ((datos.t_elapsed ?? 0)/60).toFixed(2);
+          document.getElementById('horno_t_total').textContent = ((datos.t_total ?? 0)/60).toFixed(2);
+          // Guarda la temperatura inicial solo una vez al recibirla del ESP
+          if (hornoTempIni === null && typeof datos.temp === "number") {
+            hornoTempIni = datos.temp;
+            saveHornoState();
+          }
+          hornoUpdateCharts(datos);
+        } catch (e) {}
+      }
+    });
+  }
+
+  window.onload = function() {
+    conectarMQTT();
+    loadHornoState();
+  };
+</script>
+</body>
+</html>
+
+

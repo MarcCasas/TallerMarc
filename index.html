@@ -43,12 +43,15 @@
     #horno_estado.pausado  { color: #fd0; background: #220; border: 2px solid #bb2; }
     #horno_estado.parado   { color: #f33; background: #211; border: 2px solid #f55; }
     .compact { margin: 0.6em 0; }
+    .bascula-calib label, .bascula-calib button { display: inline-block; margin-right: 0.4em; margin-top:0.2em; }
+    .bascula-calib button { width:auto; min-width:60px; margin-top:0; }
+    .bascula-calib input[type=number] { width:90px; }
   </style>
 </head>
 <body>
   <div class="tabs">
     <button class="tab active" onclick="showTab(0)">Motor Thrust/Corriente</button>
-    <button class="tab" onclick="showTab(1)">Configuración</button>
+    <button class="tab" onclick="showTab(1)">Básculas</button>
     <button class="tab" onclick="showTab(2)">Horno</button>
   </div>
   <!-- PESTAÑA 1: MOTOR -->
@@ -85,20 +88,47 @@
       </div>
     </div>
   </div>
-
-  <!-- PESTAÑA 2: Configuración -->
+  <!-- PESTAÑA 2: BASCULAS -->
   <div class="panel" id="panel1">
-    <h2>Configuración</h2>
-    <div>
-      Broker MQTT:
-      <input id="broker_ip"
-        value="wss://c77cd5062f0045358d8a48f25befebb3.s1.eu.hivemq.cloud:8884/mqtt"
-        size="55">
-      <button onclick="reconectar()">Reconectar</button>
+    <div class="mainflex">
+      <div class="col col-left">
+        <h2>Básculas: Tara y Calibración</h2>
+        <form id="basculasForm" onsubmit="return false;">
+          <div class="bascula-calib" style="margin-bottom:1.3em">
+            <b>Báscula 1</b><br>
+            Peso: <span id="b1_val" class="value">--</span> kg
+            <br>
+            <label>Offset: <input type="number" id="b1_offset" value="0"></label>
+            <label>Factor: <input type="number" id="b1_factor" value="1" step="0.01"></label>
+            <button type="button" onclick="taraBascula(1)">Tara</button>
+            <button type="button" onclick="guardarCalibracion(1)">Guardar</button>
+          </div>
+          <div class="bascula-calib" style="margin-bottom:1.3em">
+            <b>Báscula 2</b><br>
+            Peso: <span id="b2_val" class="value">--</span> kg
+            <br>
+            <label>Offset: <input type="number" id="b2_offset" value="0"></label>
+            <label>Factor: <input type="number" id="b2_factor" value="1" step="0.01"></label>
+            <button type="button" onclick="taraBascula(2)">Tara</button>
+            <button type="button" onclick="guardarCalibracion(2)">Guardar</button>
+          </div>
+          <div class="bascula-calib" style="margin-bottom:1.3em">
+            <b>Báscula 3</b><br>
+            Peso: <span id="b3_val" class="value">--</span> kg
+            <br>
+            <label>Offset: <input type="number" id="b3_offset" value="0"></label>
+            <label>Factor: <input type="number" id="b3_factor" value="1" step="0.01"></label>
+            <button type="button" onclick="taraBascula(3)">Tara</button>
+            <button type="button" onclick="guardarCalibracion(3)">Guardar</button>
+          </div>
+        </form>
+      </div>
+      <div class="col">
+        <h3>Centro de Gravedad</h3>
+        <div>Pendiente de implementar, aquí puedes mostrar el COG si quieres.</div>
+      </div>
     </div>
-    <div style="margin-top:1rem;">Puedes cambiar el broker MQTT si lo necesitas (por ejemplo para pruebas en local).</div>
   </div>
-
   <!-- PESTAÑA 3: HORNO -->
   <div class="panel" id="panel2">
     <div class="mainflex">
@@ -147,20 +177,60 @@
   </div>
 
 <script>
-  // Calibración báscula 1
-  const BASCULA1_OFFSET = 820000;
-  const BASCULA1_FACTOR = 5000;
+  // ============================= GLOBAL CALIBRACION BASCULAS ============================= //
+  let basculaCalibracion = [
+    {offset: 0, factor: 1},
+    {offset: 0, factor: 1},
+    {offset: 0, factor: 1}
+  ];
+  window.basculaRawLast = [0, 0, 0];
 
+  function loadBasculaCalibracion() {
+    let data = localStorage.getItem('basculaCalibracion');
+    if (data) {
+      basculaCalibracion = JSON.parse(data);
+      for (let i = 0; i < 3; i++) {
+        document.getElementById(`b${i+1}_offset`).value = basculaCalibracion[i].offset;
+        document.getElementById(`b${i+1}_factor`).value = basculaCalibracion[i].factor;
+      }
+    }
+  }
+  function saveBasculaCalibracion() {
+    for (let i = 0; i < 3; i++) {
+      basculaCalibracion[i].offset = Number(document.getElementById(`b${i+1}_offset`).value);
+      basculaCalibracion[i].factor = Number(document.getElementById(`b${i+1}_factor`).value);
+    }
+    localStorage.setItem('basculaCalibracion', JSON.stringify(basculaCalibracion));
+  }
+  function taraBascula(idx) {
+    if (window.basculaRawLast && typeof window.basculaRawLast[idx-1] === "number") {
+      document.getElementById(`b${idx}_offset`).value = window.basculaRawLast[idx-1];
+      guardarCalibracion(idx);
+    }
+  }
+  function guardarCalibracion(idx) {
+    saveBasculaCalibracion();
+  }
+  function actualizarBasculas(datos) {
+    let raw = [datos.raw1, datos.raw2, datos.raw3];
+    window.basculaRawLast = raw;
+    for (let i = 0; i < 3; i++) {
+      let offset = basculaCalibracion[i].offset;
+      let factor = basculaCalibracion[i].factor;
+      let kg = ((raw[i] ?? 0) - offset) / factor;
+      document.getElementById(`b${i+1}_val`).textContent = kg.toFixed(2);
+    }
+  }
+
+  // ============================= RESTO DE FUNCIONES (Motor/Horno/MQTT) =================== //
   function showTab(n) {
     document.querySelectorAll('.tab').forEach((tab, i) => tab.classList.toggle('active', i===n));
     document.querySelectorAll('.panel').forEach((panel, i) => panel.classList.toggle('active', i===n));
   }
 
-  // MQTT CLOUD DATOS CORRECTOS
   let BROKER = "wss://c77cd5062f0045358d8a48f25befebb3.s1.eu.hivemq.cloud:8884/mqtt";
   const MQTT_USERNAME = "Marc1234";
   const MQTT_PASSWORD = "Marc1234";
-
   let client = null;
   const TOPIC_DATOS = "taller/motor/datos";
   const TOPIC_POTENCIA = "taller/motor/potencia";
@@ -212,13 +282,6 @@
     }, 100);
   }
 
-  function reconectar() {
-    BROKER = document.getElementById('broker_ip').value;
-    localStorage.setItem('broker_ip', BROKER);
-    conectarMQTT();
-  }
-
-  // Funciones para sincronizar slider y input y enviar PWM al ESP
   function onSliderChange(value) {
     const val = Number(value);
     document.getElementById('pot_input').value = val;
@@ -445,13 +508,8 @@
       if(topic === TOPIC_BASCULAS) {
         try {
           const datos = JSON.parse(message);
-          if ('raw1' in datos) {
-            let kg = (datos.raw1 + 93000) / -10500;
-            let thrustN = kg * 9.81;
-            thrustN =  thrustN;
-            document.getElementById('thrust').textContent = isNaN(thrustN) ? '--' : thrustN.toFixed(2);
-            ultimoThrustN = thrustN;
-          }
+          actualizarBasculas(datos);
+          // Aquí también puedes actualizar thrust si quieres
         } catch (e) {
           document.getElementById('status').textContent = "Error en datos MQTT (bascula)";
         }
@@ -543,14 +601,13 @@
   }
 
   window.onload = function() {
+    loadBasculaCalibracion();
     if(localStorage.getItem('broker_ip')) {
-      document.getElementById('broker_ip').value = localStorage.getItem('broker_ip');
-      BROKER = document.getElementById('broker_ip').value;
+      BROKER = localStorage.getItem('broker_ip');
     }
     conectarMQTT();
     loadHornoState();
   };
-
 </script>
 </body>
 </html>

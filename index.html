@@ -177,7 +177,7 @@
   </div>
 
 <script>
-  // ============================= GLOBAL CALIBRACION BASCULAS ============================= //
+  // ==== Calibración Básculas GLOBAL ====
   let basculaCalibracion = [
     {offset: 0, factor: 1},
     {offset: 0, factor: 1},
@@ -222,7 +222,7 @@
     }
   }
 
-  // ============================= RESTO DE FUNCIONES (Motor/Horno/MQTT) =================== //
+  // ==== Motor/Horno/MQTT ====
   function showTab(n) {
     document.querySelectorAll('.tab').forEach((tab, i) => tab.classList.toggle('active', i===n));
     document.querySelectorAll('.panel').forEach((panel, i) => panel.classList.toggle('active', i===n));
@@ -251,7 +251,6 @@
     document.getElementById('stopBtn').disabled = false;
     document.getElementById('logStatus').textContent = 'Logging...';
   }
-
   function stopLogging() {
     logging = false;
     document.getElementById('startBtn').disabled = false;
@@ -287,7 +286,6 @@
     document.getElementById('pot_input').value = val;
     enviarPotencia(val);
   }
-
   function onInputChange(value) {
     let val = Number(value);
     if (isNaN(val)) val = 0;
@@ -296,7 +294,6 @@
     document.getElementById('pot_slider').value = val;
     enviarPotencia(val);
   }
-
   function enviarPotencia(val) {
     if (client && client.connected) {
       client.publish(TOPIC_POTENCIA, val.toString());
@@ -304,7 +301,7 @@
     }
   }
 
-  // ========= HORNO: ESCALA FIJA, ESTADO, Y REAL CONTINUA =========
+  // ========= HORNO =========
   const HORNO_DT = 0.25;
   let hornoCurvaConsigna = [];
   let hornoCurvaReal = [];
@@ -314,7 +311,6 @@
   let hornoCicloActivo = false;
   let hornoTempMaxActual = 150;
   let hornoTempIni = null;
-
   function saveHornoState() {
     const state = {
       hornoCurvaConsigna,
@@ -327,7 +323,6 @@
     };
     localStorage.setItem('hornoState', JSON.stringify(state));
   }
-
   function loadHornoState() {
     const saved = localStorage.getItem('hornoState');
     if (saved) {
@@ -346,11 +341,9 @@
       } catch(e) { console.log("Error al cargar estado horno:", e); }
     }
   }
-
   function clearHornoState() {
     localStorage.removeItem('hornoState');
   }
-
   function showEstado(estado) {
     const est = document.getElementById("horno_estado");
     est.className = "";
@@ -365,7 +358,6 @@
       est.textContent = "PARADO";
     }
   }
-
   function generarCurvaHorno(tempMax, rampUp, hold, rampDown, t_ini = 25) {
     let curva = [], tiempos = [];
     let dt = HORNO_DT, cur_temp = t_ini, t = 0;
@@ -391,7 +383,6 @@
     hornoTempMaxActual = Math.max(...curva);
     saveHornoState();
   }
-
   function hornoInitChart() {
     if (hornoChart) hornoChart.destroy();
     const ctx = document.getElementById('hornoChart').getContext('2d');
@@ -415,7 +406,6 @@
       }
     });
   }
-
   function iniciarHorno() {
     if (hornoTempIni === null) {
       alert("Esperando la temperatura inicial del horno...");
@@ -438,7 +428,6 @@
     client.publish(TOPIC_HORNO_CMD, JSON.stringify(msg));
     saveHornoState();
   }
-
   function hornoUpdateCharts(datos) {
     if (!hornoCicloActivo || hornoCurvaReal.length === 0 || typeof datos.t_elapsed === "undefined") return;
     let idx = Math.round((datos.t_elapsed || 0) / HORNO_DT);
@@ -454,7 +443,6 @@
     showEstado(datos.fase || "parado");
     saveHornoState();
   }
-
   function pausarHorno() { client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "pause"})); }
   function reanudarHorno() { client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "resume"})); }
   function pararHorno() {
@@ -462,15 +450,12 @@
     hornoTempIni = null;
     clearHornoState();
   }
-
   function conectarMQTT() {
     if (client) client.end(true);
-
     client = mqtt.connect(BROKER, {
       username: MQTT_USERNAME,
       password: MQTT_PASSWORD
     });
-
     client.on('connect', () => {
       document.getElementById('status').textContent = "MQTT conectado";
       client.subscribe(TOPIC_DATOS);
@@ -509,7 +494,7 @@
         try {
           const datos = JSON.parse(message);
           actualizarBasculas(datos);
-          // Aquí también puedes actualizar thrust si quieres
+          // Si quieres: thrust para motor
         } catch (e) {
           document.getElementById('status').textContent = "Error en datos MQTT (bascula)";
         }
@@ -534,7 +519,6 @@
       }
     });
   }
-
   // Gráficas Motor
   const N = 60;
   const corrienteChart = new Chart(document.getElementById('corrienteChart').getContext('2d'), {
@@ -562,7 +546,6 @@
       plugins: { legend: { labels: { color: "#fff" } } }
     }
   });
-
   const thrustChart = new Chart(document.getElementById('thrustChart').getContext('2d'), {
     type: 'line',
     data: {
@@ -588,7 +571,6 @@
       plugins: { legend: { labels: { color: "#fff" } } }
     }
   });
-
   function updateCharts(corriente, thrustN) {
     let dataC = corrienteChart.data.datasets[0].data;
     dataC.push(corriente);
@@ -599,15 +581,12 @@
     if (dataT.length > N) dataT.shift();
     thrustChart.update('none');
   }
-
   window.onload = function() {
     loadBasculaCalibracion();
-    if(localStorage.getItem('broker_ip')) {
-      BROKER = localStorage.getItem('broker_ip');
-    }
     conectarMQTT();
     loadHornoState();
   };
 </script>
 </body>
 </html>
+

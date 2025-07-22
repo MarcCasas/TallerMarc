@@ -23,7 +23,7 @@
     #pot_input { margin-left: 12px; border-radius: 6px; border: none; padding: 5px; width: 58px; font-size:1.05em; }
     button { margin-top: 1rem; width: 100%; padding: 0.7rem; border: none; background: #59f; color: #fff; border-radius: 6px; font-size: 1.1rem; }
     #status { font-size: 0.96rem; margin-top: 2rem; color: #8f8; }
-    .graf { background: #1b1c20; border-radius: 12px; margin: 1.5rem 0; padding: 1rem; height: 480px; }
+    .graf { background: #1b1c20; border-radius: 12px; margin: 1.5rem 0; padding: 1rem; height: 220px; }
     #hornoChart { width: 99% !important; height: 450px !important; }
     @media (max-width: 900px) {
       .mainflex { flex-direction: column; }
@@ -43,7 +43,7 @@
     #horno_estado.pausado  { color: #fd0; background: #220; border: 2px solid #bb2; }
     #horno_estado.parado   { color: #f33; background: #211; border: 2px solid #f55; }
     .compact { margin: 0.6em 0; }
-    .bascula-calib label, .bascula-calib button { display: inline-block; margin-right: 0.4em; margin-top:0.2em; }
+    .bascula-calib label, .bascula-calib button, .bascula-calib input[type=number] { display: inline-block; margin-right: 0.4em; margin-top:0.2em; }
     .bascula-calib button { width:auto; min-width:60px; margin-top:0; }
     .bascula-calib input[type=number] { width:90px; }
   </style>
@@ -99,8 +99,10 @@
             Peso: <span id="b1_val" class="value">--</span> kg
             <br>
             <label>Offset: <input type="number" id="b1_offset" value="0"></label>
-            <label>Factor: <input type="number" id="b1_factor" value="1" step="0.01"></label>
+            <label>Factor: <input type="number" id="b1_factor" value="1" step="0.01" readonly></label>
+            <label>Peso conocido: <input type="number" id="b1_known" value="0" min="0" step="0.01"></label>
             <button type="button" onclick="taraBascula(1)">Tara</button>
+            <button type="button" onclick="calibrarBascula(1)">Calibrar</button>
             <button type="button" onclick="guardarCalibracion(1)">Guardar</button>
           </div>
           <div class="bascula-calib" style="margin-bottom:1.3em">
@@ -108,8 +110,10 @@
             Peso: <span id="b2_val" class="value">--</span> kg
             <br>
             <label>Offset: <input type="number" id="b2_offset" value="0"></label>
-            <label>Factor: <input type="number" id="b2_factor" value="1" step="0.01"></label>
+            <label>Factor: <input type="number" id="b2_factor" value="1" step="0.01" readonly></label>
+            <label>Peso conocido: <input type="number" id="b2_known" value="0" min="0" step="0.01"></label>
             <button type="button" onclick="taraBascula(2)">Tara</button>
+            <button type="button" onclick="calibrarBascula(2)">Calibrar</button>
             <button type="button" onclick="guardarCalibracion(2)">Guardar</button>
           </div>
           <div class="bascula-calib" style="margin-bottom:1.3em">
@@ -117,15 +121,18 @@
             Peso: <span id="b3_val" class="value">--</span> kg
             <br>
             <label>Offset: <input type="number" id="b3_offset" value="0"></label>
-            <label>Factor: <input type="number" id="b3_factor" value="1" step="0.01"></label>
+            <label>Factor: <input type="number" id="b3_factor" value="1" step="0.01" readonly></label>
+            <label>Peso conocido: <input type="number" id="b3_known" value="0" min="0" step="0.01"></label>
             <button type="button" onclick="taraBascula(3)">Tara</button>
+            <button type="button" onclick="calibrarBascula(3)">Calibrar</button>
             <button type="button" onclick="guardarCalibracion(3)">Guardar</button>
           </div>
         </form>
       </div>
       <div class="col">
-        <h3>Centro de Gravedad</h3>
-        <div>Pendiente de implementar, aquí puedes mostrar el COG si quieres.</div>
+        <div class="graf"><canvas id="b1_chart"></canvas></div>
+        <div class="graf"><canvas id="b2_chart"></canvas></div>
+        <div class="graf"><canvas id="b3_chart"></canvas></div>
       </div>
     </div>
   </div>
@@ -177,13 +184,19 @@
   </div>
 
 <script>
-  // ==== Calibración Básculas GLOBAL ====
+  // ==== Calibración Básculas GLOBAL + Historial ====
   let basculaCalibracion = [
     {offset: 0, factor: 1},
     {offset: 0, factor: 1},
     {offset: 0, factor: 1}
   ];
   window.basculaRawLast = [0, 0, 0];
+  let basculaPesos = [
+    Array(60).fill(null),
+    Array(60).fill(null),
+    Array(60).fill(null)
+  ];
+  let basculaCharts = [null, null, null];
 
   function loadBasculaCalibracion() {
     let data = localStorage.getItem('basculaCalibracion');
@@ -208,6 +221,18 @@
       guardarCalibracion(idx);
     }
   }
+  function calibrarBascula(idx) {
+    let known = Number(document.getElementById(`b${idx}_known`).value);
+    let offset = Number(document.getElementById(`b${idx}_offset`).value);
+    let raw = window.basculaRawLast[idx-1];
+    if (known > 0 && typeof raw === "number" && raw != offset) {
+      let factor = (raw - offset) / known;
+      document.getElementById(`b${idx}_factor`).value = factor.toFixed(4);
+      guardarCalibracion(idx);
+    } else {
+      alert("Introduce un peso conocido mayor que 0 y asegúrate de haber tarado correctamente la báscula.");
+    }
+  }
   function guardarCalibracion(idx) {
     saveBasculaCalibracion();
   }
@@ -219,10 +244,53 @@
       let factor = basculaCalibracion[i].factor;
       let kg = ((raw[i] ?? 0) - offset) / factor;
       document.getElementById(`b${i+1}_val`).textContent = kg.toFixed(2);
+
+      // Historial para gráfica
+      if (!isNaN(kg)) {
+        basculaPesos[i].push(kg);
+        if (basculaPesos[i].length > 60) basculaPesos[i].shift();
+      } else {
+        basculaPesos[i].push(null);
+        if (basculaPesos[i].length > 60) basculaPesos[i].shift();
+      }
+      if (basculaCharts[i]) {
+        basculaCharts[i].data.datasets[0].data = basculaPesos[i];
+        basculaCharts[i].update('none');
+      }
+    }
+  }
+  function initBasculaCharts() {
+    for (let i = 0; i < 3; i++) {
+      let ctx = document.getElementById(`b${i+1}_chart`).getContext('2d');
+      basculaCharts[i] = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: Array(60).fill(""),
+          datasets: [{
+            label: `Báscula ${i+1} (kg)`,
+            data: basculaPesos[i],
+            borderWidth: 2,
+            borderColor: ['#4cf','#fb6','#5f6'][i],
+            backgroundColor: ['#4cf4','#fb62','#5f62'][i],
+            pointRadius: 0,
+            fill: true,
+            tension: 0.15
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            x: { display: false },
+            y: { min: 0, max: 200, ticks: { color: "#fff" }, title: { display: true, text: 'kg', color: "#fff" } }
+          },
+          plugins: { legend: { labels: { color: "#fff" } } }
+        }
+      });
     }
   }
 
-  // ==== Motor/Horno/MQTT ====
+  // ============================= MOTOR/HORNO/MQTT RESTO =============================
   function showTab(n) {
     document.querySelectorAll('.tab').forEach((tab, i) => tab.classList.toggle('active', i===n));
     document.querySelectorAll('.panel').forEach((panel, i) => panel.classList.toggle('active', i===n));
@@ -280,7 +348,6 @@
       document.getElementById('logStatus').textContent = 'Descarga completada.';
     }, 100);
   }
-
   function onSliderChange(value) {
     const val = Number(value);
     document.getElementById('pot_input').value = val;
@@ -494,7 +561,6 @@
         try {
           const datos = JSON.parse(message);
           actualizarBasculas(datos);
-          // Si quieres: thrust para motor
         } catch (e) {
           document.getElementById('status').textContent = "Error en datos MQTT (bascula)";
         }
@@ -583,10 +649,10 @@
   }
   window.onload = function() {
     loadBasculaCalibracion();
+    initBasculaCharts();
     conectarMQTT();
     loadHornoState();
   };
 </script>
 </body>
 </html>
-

@@ -446,7 +446,7 @@
         try {
           const datos = JSON.parse(message);
           if ('raw1' in datos) {
-            let kg = (datos.raw1 - BASCULA1_OFFSET) / BASCULA1_FACTOR;
+            let kg = (datos.raw1 + 97000) / -120000;
             let thrustN = kg * 9.81;
             thrustN = Math.max(0, thrustN);
             document.getElementById('thrust').textContent = isNaN(thrustN) ? '--' : thrustN.toFixed(2);

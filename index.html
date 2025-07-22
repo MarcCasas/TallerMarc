@@ -11,8 +11,8 @@
     .tab { padding: 1rem 2rem; cursor: pointer; background: #18191c; border: none; color: #aaa; font-size: 1.1rem;}
     .tab.active { background: #23252a; color: #fff; border-bottom: 2px solid #59f;}
     .mainflex { display: flex; flex-wrap: wrap; max-width: 1600px; margin: auto; }
-    .col { flex: 1 1 340px; min-width: 300px; padding: 2rem; }
-    .col-left { max-width: 420px; }
+    .col { flex: 1 1 380px; min-width: 340px; padding: 2rem; }
+    .col-left { max-width: 480px; }
     .panel { display: none; }
     .panel.active { display: block; }
     h2 { margin-top: 0; }
@@ -23,8 +23,8 @@
     #pot_input { margin-left: 12px; border-radius: 6px; border: none; padding: 5px; width: 58px; font-size:1.05em; }
     button { margin-top: 1rem; width: 100%; padding: 0.7rem; border: none; background: #59f; color: #fff; border-radius: 6px; font-size: 1.1rem; }
     #status { font-size: 0.96rem; margin-top: 2rem; color: #8f8; }
-    .graf { background: #1b1c20; border-radius: 12px; margin: 1.5rem 0; padding: 1rem; height: 220px; }
-    #hornoChart { width: 99% !important; height: 450px !important; }
+    .graf { background: #1b1c20; border-radius: 12px; margin: 1.5rem 0; padding: 1rem 1.3rem 1rem 1.3rem; height: 380px; display:flex; align-items:center;}
+    canvas { width: 100% !important; height: 340px !important; }
     @media (max-width: 900px) {
       .mainflex { flex-direction: column; }
       .col { max-width: 100% !important; }
@@ -43,9 +43,56 @@
     #horno_estado.pausado  { color: #fd0; background: #220; border: 2px solid #bb2; }
     #horno_estado.parado   { color: #f33; background: #211; border: 2px solid #f55; }
     .compact { margin: 0.6em 0; }
-    .bascula-calib label, .bascula-calib button, .bascula-calib input[type=number] { display: inline-block; margin-right: 0.4em; margin-top:0.2em; }
-    .bascula-calib button { width:auto; min-width:60px; margin-top:0; }
-    .bascula-calib input[type=number] { width:90px; }
+
+    /* Mejoras visuales calibración */
+    .bascula-calib {
+      background: #23252a;
+      border-radius: 10px;
+      margin-bottom: 2.3em;
+      padding: 1.1em 1.4em 1.4em 1.2em;
+      box-shadow: 0 2px 14px #10101020;
+      border: 1.5px solid #36374a;
+      max-width: 380px;
+    }
+    .bascula-calib b { color: #77f; font-size: 1.13em; }
+    .bascula-calib .fila-campo {
+      display: flex;
+      align-items: center;
+      gap: 0.9em;
+      margin-bottom: 0.5em;
+      flex-wrap: wrap;
+    }
+    .bascula-calib label {
+      display: flex;
+      align-items: center;
+      font-size: 1em;
+      margin-right: 0.5em;
+      color: #bbb;
+    }
+    .bascula-calib input[type=number] {
+      margin-left: 0.3em;
+      width: 85px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #18191c;
+      color: #e2e2e2;
+      padding: 4px 7px;
+      font-size: 1.05em;
+    }
+    .bascula-calib button {
+      width: auto;
+      min-width: 90px;
+      margin-right: 0.4em;
+      margin-top: 0.4em;
+      padding: 0.48em 1.4em;
+      font-size: 1.04em;
+    }
+    .bascula-calib .peso-valor {
+      font-size: 1.19em;
+      color: #fafcff;
+      margin-bottom: 0.7em;
+      display: inline-block;
+    }
   </style>
 </head>
 <body>
@@ -93,39 +140,52 @@
     <div class="mainflex">
       <div class="col col-left">
         <h2>Básculas: Tara y Calibración</h2>
+
         <form id="basculasForm" onsubmit="return false;">
-          <div class="bascula-calib" style="margin-bottom:1.3em">
-            <b>Báscula 1</b><br>
-            Peso: <span id="b1_val" class="value">--</span> kg
-            <br>
-            <label>Offset: <input type="number" id="b1_offset" value="0"></label>
-            <label>Factor: <input type="number" id="b1_factor" value="1" step="0.01" readonly></label>
-            <label>Peso conocido: <input type="number" id="b1_known" value="0" min="0" step="0.01"></label>
-            <button type="button" onclick="taraBascula(1)">Tara</button>
-            <button type="button" onclick="calibrarBascula(1)">Calibrar</button>
-            <button type="button" onclick="guardarCalibracion(1)">Guardar</button>
+          <div class="bascula-calib">
+            <div class="peso-valor">Báscula 1 – <span id="b1_val" class="value">--</span> kg</div>
+            <div class="fila-campo">
+              <label>Offset: <input type="number" id="b1_offset" value="0"></label>
+              <label>Factor: <input type="number" id="b1_factor" value="1" step="0.01" readonly></label>
+            </div>
+            <div class="fila-campo">
+              <label>Peso conocido: <input type="number" id="b1_known" value="0" min="0" step="0.01"></label>
+            </div>
+            <div class="fila-campo">
+              <button type="button" onclick="taraBascula(1)">Tara</button>
+              <button type="button" onclick="calibrarBascula(1)">Calibrar</button>
+              <button type="button" onclick="guardarCalibracion(1)">Guardar</button>
+            </div>
           </div>
-          <div class="bascula-calib" style="margin-bottom:1.3em">
-            <b>Báscula 2</b><br>
-            Peso: <span id="b2_val" class="value">--</span> kg
-            <br>
-            <label>Offset: <input type="number" id="b2_offset" value="0"></label>
-            <label>Factor: <input type="number" id="b2_factor" value="1" step="0.01" readonly></label>
-            <label>Peso conocido: <input type="number" id="b2_known" value="0" min="0" step="0.01"></label>
-            <button type="button" onclick="taraBascula(2)">Tara</button>
-            <button type="button" onclick="calibrarBascula(2)">Calibrar</button>
-            <button type="button" onclick="guardarCalibracion(2)">Guardar</button>
+          <div class="bascula-calib">
+            <div class="peso-valor">Báscula 2 – <span id="b2_val" class="value">--</span> kg</div>
+            <div class="fila-campo">
+              <label>Offset: <input type="number" id="b2_offset" value="0"></label>
+              <label>Factor: <input type="number" id="b2_factor" value="1" step="0.01" readonly></label>
+            </div>
+            <div class="fila-campo">
+              <label>Peso conocido: <input type="number" id="b2_known" value="0" min="0" step="0.01"></label>
+            </div>
+            <div class="fila-campo">
+              <button type="button" onclick="taraBascula(2)">Tara</button>
+              <button type="button" onclick="calibrarBascula(2)">Calibrar</button>
+              <button type="button" onclick="guardarCalibracion(2)">Guardar</button>
+            </div>
           </div>
-          <div class="bascula-calib" style="margin-bottom:1.3em">
-            <b>Báscula 3</b><br>
-            Peso: <span id="b3_val" class="value">--</span> kg
-            <br>
-            <label>Offset: <input type="number" id="b3_offset" value="0"></label>
-            <label>Factor: <input type="number" id="b3_factor" value="1" step="0.01" readonly></label>
-            <label>Peso conocido: <input type="number" id="b3_known" value="0" min="0" step="0.01"></label>
-            <button type="button" onclick="taraBascula(3)">Tara</button>
-            <button type="button" onclick="calibrarBascula(3)">Calibrar</button>
-            <button type="button" onclick="guardarCalibracion(3)">Guardar</button>
+          <div class="bascula-calib">
+            <div class="peso-valor">Báscula 3 – <span id="b3_val" class="value">--</span> kg</div>
+            <div class="fila-campo">
+              <label>Offset: <input type="number" id="b3_offset" value="0"></label>
+              <label>Factor: <input type="number" id="b3_factor" value="1" step="0.01" readonly></label>
+            </div>
+            <div class="fila-campo">
+              <label>Peso conocido: <input type="number" id="b3_known" value="0" min="0" step="0.01"></label>
+            </div>
+            <div class="fila-campo">
+              <button type="button" onclick="taraBascula(3)">Tara</button>
+              <button type="button" onclick="calibrarBascula(3)">Calibrar</button>
+              <button type="button" onclick="guardarCalibracion(3)">Guardar</button>
+            </div>
           </div>
         </form>
       </div>
@@ -280,9 +340,15 @@
         options: {
           responsive: true,
           animation: false,
+          maintainAspectRatio: false,
           scales: {
             x: { display: false },
-            y: { min: 0, max: 200, ticks: { color: "#fff" }, title: { display: true, text: 'kg', color: "#fff" } }
+            y: {
+              min: 0,
+              max: 200,
+              ticks: { color: "#fff" },
+              title: { display: true, text: 'kg', color: "#fff" }
+            }
           },
           plugins: { legend: { labels: { color: "#fff" } } }
         }
@@ -465,6 +531,7 @@
       options: {
         responsive: true,
         animation: false,
+        maintainAspectRatio: false,
         scales: {
           x: { display: true, title: {display: true, text: "Tiempo (min)", color:"#fff"}, ticks: {color:"#fff"} },
           y: { min: 0, max: Math.ceil(hornoTempMaxActual*1.5), ticks: { color: "#fff" }, title: { display: true, text: '°C', color: "#fff" } }
@@ -605,6 +672,7 @@
     options: {
       responsive: true,
       animation: false,
+      maintainAspectRatio: false,
       scales: {
         x: { display: false },
         y: { min: 0, max: 60, ticks: { color: "#fff" }, title: { display: true, text: 'A', color: "#fff" } }
@@ -630,6 +698,7 @@
     options: {
       responsive: true,
       animation: false,
+      maintainAspectRatio: false,
       scales: {
         x: { display: false },
         y: { min: 0, max: 10, ticks: { color: "#fff" }, title: { display: true, text: 'N', color: "#fff" } }

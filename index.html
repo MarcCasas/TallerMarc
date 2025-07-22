@@ -43,8 +43,6 @@
     #horno_estado.pausado  { color: #fd0; background: #220; border: 2px solid #bb2; }
     #horno_estado.parado   { color: #f33; background: #211; border: 2px solid #f55; }
     .compact { margin: 0.6em 0; }
-
-    /* Mejoras visuales calibración */
     .bascula-calib {
       background: #23252a;
       border-radius: 10px;
@@ -242,7 +240,6 @@
       </div>
     </div>
   </div>
-
 <script>
   // ==== Calibración Básculas GLOBAL + Historial ====
   let basculaCalibracion = [
@@ -257,6 +254,7 @@
     Array(60).fill(null)
   ];
   let basculaCharts = [null, null, null];
+  let ultimoThrustN = null; // <-- Empuje de la báscula 1 calibrada
 
   function loadBasculaCalibracion() {
     let data = localStorage.getItem('basculaCalibracion');
@@ -317,6 +315,10 @@
         basculaCharts[i].data.datasets[0].data = basculaPesos[i];
         basculaCharts[i].update('none');
       }
+      // --- ACTUALIZA EL EMPUJE DE LA BASCULA 1 PARA EL MOTOR ---
+      if(i === 0) {
+        ultimoThrustN = kg * 9.81;
+      }
     }
   }
   function initBasculaCharts() {
@@ -375,7 +377,6 @@
   let logging = false;
   let logData = [];
   let logStartTime = null;
-  let ultimoThrustN = null;
 
   function startLogging() {
     logging = true;
@@ -608,6 +609,9 @@
           document.getElementById('potencia').textContent = datos.potencia_pct ?? '--';
           document.getElementById('pwmus').textContent = datos.pwm_us ?? '--';
           document.getElementById('pot_esp').textContent = datos.potencia_pct ?? '--';
+          // Mostrar el empuje calibrado de la bascula 1
+          document.getElementById('thrust').textContent = 
+            (typeof ultimoThrustN === "number" && !isNaN(ultimoThrustN)) ? ultimoThrustN.toFixed(2) : "--";
           let thrustVal = ultimoThrustN;
           if (!isNaN(datos.corriente) && !isNaN(thrustVal)) {
             updateCharts(Number(datos.corriente), Number(thrustVal));

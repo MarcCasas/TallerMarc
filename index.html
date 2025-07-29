@@ -91,6 +91,34 @@
       margin-bottom: 0.7em;
       display: inline-block;
     }
+    /* -------- Servo/ESC pestaña nueva -------- */
+    #secuencia_lista {
+      font-size: 1.04em;
+      color: #e2e2e2;
+    }
+    #secuencia_lista .paso {
+      display: flex;
+      align-items: center;
+      gap: 0.8em;
+      margin-bottom: 0.2em;
+    }
+    #secuencia_lista input[type=number] {
+      width: 65px;
+      margin-right: 0.3em;
+      border-radius: 5px;
+      border: 1px solid #444;
+      background: #18191c;
+      color: #e2e2e2;
+      padding: 3px 6px;
+      font-size: 1em;
+    }
+    #secuencia_lista button {
+      width: auto;
+      padding: 0.2em 0.7em;
+      margin-top: 0;
+      font-size: 0.98em;
+      margin-right: 0.2em;
+    }
   </style>
 </head>
 <body>
@@ -98,6 +126,7 @@
     <button class="tab active" onclick="showTab(0)">Motor Thrust/Corriente</button>
     <button class="tab" onclick="showTab(1)">Básculas</button>
     <button class="tab" onclick="showTab(2)">Horno</button>
+    <button class="tab" onclick="showTab(3)">Servo / ESC</button>
   </div>
   <!-- PESTAÑA 1: MOTOR -->
   <div class="panel active" id="panel0">
@@ -138,7 +167,6 @@
     <div class="mainflex">
       <div class="col col-left">
         <h2>Básculas: Tara y Calibración</h2>
-
         <form id="basculasForm" onsubmit="return false;">
           <div class="bascula-calib">
             <div class="peso-valor">Báscula 1 – <span id="b1_val" class="value">--</span> kg</div>
@@ -236,6 +264,55 @@
       <div class="col">
         <div class="graf">
           <canvas id="hornoChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- PESTAÑA 4: SERVO/ESC -->
+  <div class="panel" id="panel3">
+    <div class="mainflex">
+      <div class="col col-left">
+        <h2>Control Servo y ESC</h2>
+        <div class="row">
+          <b>Servo:</b>
+        </div>
+        <div class="row">
+          <label class="label">Ángulo (°):</label>
+          <input type="range" min="0" max="90" value="0" id="servo_slider" class="slider" oninput="onServoSlider(this.value)">
+          <input type="number" min="0" max="90" value="0" id="servo_input" style="margin-left:8px;width:60px;" oninput="onServoInput(this.value)">
+          <button style="margin-left:16px;width:auto;" onclick="centrarServo()">Centrar (45°)</button>
+        </div>
+        <div class="row" style="margin-bottom:1.5em;">
+          Ángulo actual: <span id="servo_estado" class="value">0</span>°
+        </div>
+        <div class="row" style="margin-bottom:0.6em;">
+          <b>Secuencia de movimientos:</b>
+          <button onclick="addSecuenciaPaso()" style="margin-left:18px;width:auto;">Añadir paso</button>
+          <button onclick="limpiarSecuencia()" style="margin-left:8px;width:auto;background:#a33;">Limpiar</button>
+        </div>
+        <div class="row" id="secuencia_lista" style="background:#20212a;border-radius:8px;min-height:46px;padding:0.7em 1em 0.7em 0.7em;margin-bottom:1em;">
+          <!-- Lista dinámica -->
+        </div>
+        <div class="row">
+          <label>Velocidad secuencia: <input type="number" id="servo_seq_vel" value="1.0" step="0.1" min="0.1" max="10" style="width:70px;"> seg/paso</label>
+          <button onclick="playSecuencia()" style="width:auto;margin-left:18px;">Play</button>
+          <button onclick="pararSecuencia()" style="width:auto;background:#a33;margin-left:6px;">Parar</button>
+        </div>
+        <hr>
+        <div class="row"><b>ESC:</b></div>
+        <div class="row">
+          <label class="label">PWM (%)</label>
+          <input type="range" min="0" max="100" value="0" id="esc_slider" class="slider" oninput="onESCSlider(this.value)">
+          <input type="number" min="0" max="100" value="0" id="esc_input" style="margin-left:12px;width:60px;" oninput="onESCInput(this.value)">
+        </div>
+        <div class="row">PWM actual: <span id="esc_estado" class="value">0</span>%</div>
+      </div>
+      <div class="col">
+        <div class="graf">
+          <canvas id="servoChart"></canvas>
+        </div>
+        <div class="graf">
+          <canvas id="escChart"></canvas>
         </div>
       </div>
     </div>
@@ -373,6 +450,7 @@
   const TOPIC_BASCULAS = "taller/basculas/datos";
   const TOPIC_HORNO_DATOS = "taller/horno/datos";
   const TOPIC_HORNO_CMD = "taller/horno/consigna";
+  const TOPIC_SERVO = "taller/servo/angulo";
 
   let logging = false;
   let logData = [];
@@ -431,7 +509,7 @@
   function enviarPotencia(val) {
     if (client && client.connected) {
       client.publish(TOPIC_POTENCIA, val.toString());
-      console.log("Enviado PWM:", val);
+      //console.log("Enviado PWM:", val);
     }
   }
 
@@ -596,6 +674,7 @@
       client.subscribe(TOPIC_DATOS);
       client.subscribe(TOPIC_BASCULAS);
       client.subscribe(TOPIC_HORNO_DATOS);
+      client.subscribe(TOPIC_SERVO); // Nueva suscripción
     });
     client.on('reconnect', () => { document.getElementById('status').textContent = "Reconectando..."; });
     client.on('offline', () => { document.getElementById('status').textContent = "MQTT desconectado"; });
@@ -720,11 +799,218 @@
     if (dataT.length > N) dataT.shift();
     thrustChart.update('none');
   }
+
+  // === SERVO/ESC TAB - NUEVO JS ===
+  let servo_angle = 0;
+  let servoSeq = [];
+  let servoSeqTimer = null;
+  let servoSeqPlaying = false;
+  let esc_pwm = 0;
+  let servoChart, escChart;
+  let servoHistory = Array(60).fill(0);
+  let escHistory = Array(60).fill(0);
+
+  function onServoSlider(val) {
+    val = Number(val);
+    document.getElementById('servo_input').value = val;
+    servo_angle = val;
+    document.getElementById('servo_estado').textContent = val;
+    enviarServo(val);
+    addServoHistory(val);
+  }
+  function onServoInput(val) {
+    val = Number(val);
+    if (isNaN(val)) val = 0;
+    if (val < 0) val = 0;
+    if (val > 90) val = 90;
+    document.getElementById('servo_slider').value = val;
+    servo_angle = val;
+    document.getElementById('servo_estado').textContent = val;
+    enviarServo(val);
+    addServoHistory(val);
+  }
+  function centrarServo() {
+    servo_angle = 45;
+    document.getElementById('servo_slider').value = 45;
+    document.getElementById('servo_input').value = 45;
+    document.getElementById('servo_estado').textContent = 45;
+    enviarServo(45);
+    addServoHistory(45);
+  }
+  function enviarServo(val) {
+    if (client && client.connected) {
+      client.publish(TOPIC_SERVO, String(val));
+    }
+  }
+  // ESC CONTROLS
+  function onESCSlider(val) {
+    val = Number(val);
+    document.getElementById('esc_input').value = val;
+    esc_pwm = val;
+    document.getElementById('esc_estado').textContent = val;
+    enviarPotencia(val);
+    addESCHistory(val);
+  }
+  function onESCInput(val) {
+    val = Number(val);
+    if (isNaN(val)) val = 0;
+    if (val < 0) val = 0;
+    if (val > 100) val = 100;
+    document.getElementById('esc_slider').value = val;
+    esc_pwm = val;
+    document.getElementById('esc_estado').textContent = val;
+    enviarPotencia(val);
+    addESCHistory(val);
+  }
+  // ----------- Secuencia de pasos Servo ----------
+  function addSecuenciaPaso() {
+    servoSeq.push({angle: 45, t: 1});
+    renderSecuencia();
+  }
+  function renderSecuencia() {
+    let div = document.getElementById('secuencia_lista');
+    div.innerHTML = '';
+    servoSeq.forEach((p, idx) => {
+      let pasoDiv = document.createElement('div');
+      pasoDiv.className = 'paso';
+      pasoDiv.innerHTML = `
+        <span>Paso ${idx+1}:</span>
+        <label>Ángulo <input type="number" value="${p.angle}" min="0" max="90" step="1"
+          onchange="editSeqAngle(${idx}, this.value)"></label>
+        <label>Tiempo <input type="number" value="${p.t}" min="0.05" max="30" step="0.05"
+          onchange="editSeqTime(${idx}, this.value)"> s</label>
+        <button onclick="delSecuenciaPaso(${idx})" style="background:#a33;">X</button>
+      `;
+      div.appendChild(pasoDiv);
+    });
+  }
+  function editSeqAngle(idx, val) {
+    val = Number(val);
+    if (val < 0) val = 0; if (val > 90) val = 90;
+    servoSeq[idx].angle = val;
+    renderSecuencia();
+  }
+  function editSeqTime(idx, val) {
+    val = Number(val);
+    if (val < 0.05) val = 0.05;
+    servoSeq[idx].t = val;
+    renderSecuencia();
+  }
+  function delSecuenciaPaso(idx) {
+    servoSeq.splice(idx, 1);
+    renderSecuencia();
+  }
+  function limpiarSecuencia() {
+    servoSeq = [];
+    renderSecuencia();
+  }
+  function playSecuencia() {
+    if (servoSeq.length === 0) return;
+    pararSecuencia();
+    let velocidad = Number(document.getElementById('servo_seq_vel').value) || 1.0;
+    let paso = 0;
+    servoSeqPlaying = true;
+    function doStep() {
+      if (!servoSeqPlaying || paso >= servoSeq.length) { servoSeqPlaying = false; return; }
+      let ang = servoSeq[paso].angle;
+      let t = servoSeq[paso].t * velocidad;
+      servo_angle = ang;
+      document.getElementById('servo_slider').value = ang;
+      document.getElementById('servo_input').value = ang;
+      document.getElementById('servo_estado').textContent = ang;
+      enviarServo(ang);
+      addServoHistory(ang);
+      paso++;
+      servoSeqTimer = setTimeout(doStep, t * 1000);
+    }
+    doStep();
+  }
+  function pararSecuencia() {
+    servoSeqPlaying = false;
+    if (servoSeqTimer) clearTimeout(servoSeqTimer);
+    servoSeqTimer = null;
+  }
+  // ----- Gráficas Servo y ESC -----
+  function addServoHistory(val) {
+    servoHistory.push(val);
+    if (servoHistory.length > 60) servoHistory.shift();
+    if (servoChart) {
+      servoChart.data.datasets[0].data = servoHistory;
+      servoChart.update('none');
+    }
+  }
+  function addESCHistory(val) {
+    escHistory.push(val);
+    if (escHistory.length > 60) escHistory.shift();
+    if (escChart) {
+      escChart.data.datasets[0].data = escHistory;
+      escChart.update('none');
+    }
+  }
+  function initServoESCCharts() {
+    let ctx1 = document.getElementById('servoChart').getContext('2d');
+    servoChart = new Chart(ctx1, {
+      type: 'line',
+      data: {
+        labels: Array(60).fill(""),
+        datasets: [{
+          label: 'Ángulo Servo (°)',
+          data: servoHistory,
+          borderWidth: 2,
+          borderColor: '#f8f',
+          backgroundColor: '#f8f2',
+          pointRadius: 0,
+          fill: true,
+          tension: 0.2
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        maintainAspectRatio: false,
+        scales: {
+          x: { display: false },
+          y: { min: 0, max: 90, ticks: { color: "#fff" }, title: { display: true, text: '°', color: "#fff" } }
+        },
+        plugins: { legend: { labels: { color: "#fff" } } }
+      }
+    });
+    let ctx2 = document.getElementById('escChart').getContext('2d');
+    escChart = new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: Array(60).fill(""),
+        datasets: [{
+          label: 'PWM ESC (%)',
+          data: escHistory,
+          borderWidth: 2,
+          borderColor: '#8ff',
+          backgroundColor: '#8ff2',
+          pointRadius: 0,
+          fill: true,
+          tension: 0.2
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        maintainAspectRatio: false,
+        scales: {
+          x: { display: false },
+          y: { min: 0, max: 100, ticks: { color: "#fff" }, title: { display: true, text: '%', color: "#fff" } }
+        },
+        plugins: { legend: { labels: { color: "#fff" } } }
+      }
+    });
+  }
+  // ----- Hook de inicio global -----
   window.onload = function() {
     loadBasculaCalibracion();
     initBasculaCharts();
     conectarMQTT();
     loadHornoState();
+    initServoESCCharts();
+    renderSecuencia();
   };
 </script>
 </body>

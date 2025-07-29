@@ -91,34 +91,23 @@
       margin-bottom: 0.7em;
       display: inline-block;
     }
-    /* -------- Servo/ESC pestaña nueva -------- */
-    #secuencia_lista {
-      font-size: 1.04em;
-      color: #e2e2e2;
+    .servoesc-box {
+      background: #23252a;
+      border-radius: 12px;
+      box-shadow: 0 2px 14px #15151720;
+      border: 1.5px solid #36374a;
+      padding: 1.4em 1.6em 2em 1.4em;
+      max-width: 420px;
+      margin-bottom: 2.3em;
     }
-    #secuencia_lista .paso {
-      display: flex;
-      align-items: center;
-      gap: 0.8em;
-      margin-bottom: 0.2em;
+    .servoesc-box .fila-campo {
+      display: flex; align-items: center; gap: 1em; margin-bottom: 1em; flex-wrap: wrap;
     }
-    #secuencia_lista input[type=number] {
-      width: 65px;
-      margin-right: 0.3em;
-      border-radius: 5px;
-      border: 1px solid #444;
-      background: #18191c;
-      color: #e2e2e2;
-      padding: 3px 6px;
-      font-size: 1em;
-    }
-    #secuencia_lista button {
-      width: auto;
-      padding: 0.2em 0.7em;
-      margin-top: 0;
-      font-size: 0.98em;
-      margin-right: 0.2em;
-    }
+    .servoesc-box label { min-width: 105px; color:#cfd5fc;}
+    .servoesc-box input[type=number] { width: 80px; border-radius: 5px; border:1px solid #444; background:#18191c; color:#e2e2e2; padding:4px 6px;}
+    .servoesc-box .slider { width: 140px; margin:0 8px;}
+    .servoesc-box button { margin:0.5em 1em 0 0; width:auto; min-width:90px;}
+    .servoesc-box .value { color:#fafcff; margin-left:8px;}
   </style>
 </head>
 <body>
@@ -126,7 +115,7 @@
     <button class="tab active" onclick="showTab(0)">Motor Thrust/Corriente</button>
     <button class="tab" onclick="showTab(1)">Básculas</button>
     <button class="tab" onclick="showTab(2)">Horno</button>
-    <button class="tab" onclick="showTab(3)">Servo / ESC</button>
+    <button class="tab" onclick="showTab(3)">Servo/ESC</button>
   </div>
   <!-- PESTAÑA 1: MOTOR -->
   <div class="panel active" id="panel0">
@@ -273,695 +262,133 @@
     <div class="mainflex">
       <div class="col col-left">
         <h2>Control Servo y ESC</h2>
-        <div class="row">
-          <b>Servo:</b>
+        <div class="servoesc-box">
+          <div class="fila-campo">
+            <label>Ángulo servo:</label>
+            <input type="range" min="0" max="90" value="90" id="servo_slider" class="slider" oninput="onServoSlider(this.value)">
+            <input type="number" min="0" max="90" value="90" id="servo_input" oninput="onServoInput(this.value)">
+            <span id="servo_estado" class="value">90</span>°
+          </div>
+          <div class="fila-campo">
+            <button type="button" onclick="secuenciaServo()">Secuencia demo</button>
+            <button type="button" onclick="setServo90()">Ir a 90°</button>
+            <button type="button" onclick="setServo0()">Ir a 0°</button>
+          </div>
         </div>
-        <div class="row">
-          <label class="label">Ángulo (°):</label>
-          <input type="range" min="0" max="90" value="0" id="servo_slider" class="slider" oninput="onServoSlider(this.value)">
-          <input type="number" min="0" max="90" value="0" id="servo_input" style="margin-left:8px;width:60px;" oninput="onServoInput(this.value)">
-          <button style="margin-left:16px;width:auto;" onclick="centrarServo()">Centrar (45°)</button>
+        <div class="servoesc-box">
+          <div class="fila-campo">
+            <label>PWM ESC (%):</label>
+            <input type="range" min="0" max="100" value="0" id="esc_slider" class="slider" oninput="onEscSlider(this.value)">
+            <input type="number" min="0" max="100" value="0" id="esc_input" oninput="onEscInput(this.value)">
+            <span id="esc_estado" class="value">0</span>%
+          </div>
+          <div class="fila-campo">
+            <button type="button" onclick="setESC0()">Parar ESC</button>
+          </div>
         </div>
-        <div class="row" style="margin-bottom:1.5em;">
-          Ángulo actual: <span id="servo_estado" class="value">0</span>°
-        </div>
-        <div class="row" style="margin-bottom:0.6em;">
-          <b>Secuencia de movimientos:</b>
-          <button onclick="addSecuenciaPaso()" style="margin-left:18px;width:auto;">Añadir paso</button>
-          <button onclick="limpiarSecuencia()" style="margin-left:8px;width:auto;background:#a33;">Limpiar</button>
-        </div>
-        <div class="row" id="secuencia_lista" style="background:#20212a;border-radius:8px;min-height:46px;padding:0.7em 1em 0.7em 0.7em;margin-bottom:1em;">
-          <!-- Lista dinámica -->
-        </div>
-        <div class="row">
-          <label>Velocidad secuencia: <input type="number" id="servo_seq_vel" value="1.0" step="0.1" min="0.1" max="10" style="width:70px;"> seg/paso</label>
-          <button onclick="playSecuencia()" style="width:auto;margin-left:18px;">Play</button>
-          <button onclick="pararSecuencia()" style="width:auto;background:#a33;margin-left:6px;">Parar</button>
-        </div>
-        <hr>
-        <div class="row"><b>ESC:</b></div>
-        <div class="row">
-          <label class="label">PWM (%)</label>
-          <input type="range" min="0" max="100" value="0" id="esc_slider" class="slider" oninput="onESCSlider(this.value)">
-          <input type="number" min="0" max="100" value="0" id="esc_input" style="margin-left:12px;width:60px;" oninput="onESCInput(this.value)">
-        </div>
-        <div class="row">PWM actual: <span id="esc_estado" class="value">0</span>%</div>
       </div>
       <div class="col">
-        <div class="graf">
-          <canvas id="servoChart"></canvas>
-        </div>
-        <div class="graf">
-          <canvas id="escChart"></canvas>
-        </div>
+        <!-- Aquí puedes añadir gráficas de movimientos del servo/esc si quieres -->
       </div>
     </div>
   </div>
 <script>
-  // ==== Calibración Básculas GLOBAL + Historial ====
-  let basculaCalibracion = [
-    {offset: 0, factor: 1},
-    {offset: 0, factor: 1},
-    {offset: 0, factor: 1}
-  ];
-  window.basculaRawLast = [0, 0, 0];
-  let basculaPesos = [
-    Array(60).fill(null),
-    Array(60).fill(null),
-    Array(60).fill(null)
-  ];
-  let basculaCharts = [null, null, null];
-  let ultimoThrustN = null; // <-- Empuje de la báscula 1 calibrada
+// ========== BÁSCULAS: Calibración y gráficos ==========
+let basculaCalibracion = [
+  {offset: 0, factor: 1},
+  {offset: 0, factor: 1},
+  {offset: 0, factor: 1}
+];
+window.basculaRawLast = [0, 0, 0];
+let basculaPesos = [
+  Array(60).fill(null),
+  Array(60).fill(null),
+  Array(60).fill(null)
+];
+let basculaCharts = [null, null, null];
+let ultimoThrustN = null;
 
-  function loadBasculaCalibracion() {
-    let data = localStorage.getItem('basculaCalibracion');
-    if (data) {
-      basculaCalibracion = JSON.parse(data);
-      for (let i = 0; i < 3; i++) {
-        document.getElementById(`b${i+1}_offset`).value = basculaCalibracion[i].offset;
-        document.getElementById(`b${i+1}_factor`).value = basculaCalibracion[i].factor;
-      }
-    }
-  }
-  function saveBasculaCalibracion() {
+function loadBasculaCalibracion() {
+  let data = localStorage.getItem('basculaCalibracion');
+  if (data) {
+    basculaCalibracion = JSON.parse(data);
     for (let i = 0; i < 3; i++) {
-      basculaCalibracion[i].offset = Number(document.getElementById(`b${i+1}_offset`).value);
-      basculaCalibracion[i].factor = Number(document.getElementById(`b${i+1}_factor`).value);
-    }
-    localStorage.setItem('basculaCalibracion', JSON.stringify(basculaCalibracion));
-  }
-  function taraBascula(idx) {
-    if (window.basculaRawLast && typeof window.basculaRawLast[idx-1] === "number") {
-      document.getElementById(`b${idx}_offset`).value = window.basculaRawLast[idx-1];
-      guardarCalibracion(idx);
+      document.getElementById(`b${i+1}_offset`).value = basculaCalibracion[i].offset;
+      document.getElementById(`b${i+1}_factor`).value = basculaCalibracion[i].factor;
     }
   }
-  function calibrarBascula(idx) {
-    let known = Number(document.getElementById(`b${idx}_known`).value);
-    let offset = Number(document.getElementById(`b${idx}_offset`).value);
-    let raw = window.basculaRawLast[idx-1];
-    if (known > 0 && typeof raw === "number" && raw != offset) {
-      let factor = (raw - offset) / known;
-      document.getElementById(`b${idx}_factor`).value = factor.toFixed(4);
-      guardarCalibracion(idx);
+}
+function saveBasculaCalibracion() {
+  for (let i = 0; i < 3; i++) {
+    basculaCalibracion[i].offset = Number(document.getElementById(`b${i+1}_offset`).value);
+    basculaCalibracion[i].factor = Number(document.getElementById(`b${i+1}_factor`).value);
+  }
+  localStorage.setItem('basculaCalibracion', JSON.stringify(basculaCalibracion));
+}
+function taraBascula(idx) {
+  if (window.basculaRawLast && typeof window.basculaRawLast[idx-1] === "number") {
+    document.getElementById(`b${idx}_offset`).value = window.basculaRawLast[idx-1];
+    guardarCalibracion(idx);
+  }
+}
+function calibrarBascula(idx) {
+  let known = Number(document.getElementById(`b${idx}_known`).value);
+  let offset = Number(document.getElementById(`b${idx}_offset`).value);
+  let raw = window.basculaRawLast[idx-1];
+  if (known > 0 && typeof raw === "number" && raw != offset) {
+    let factor = (raw - offset) / known;
+    document.getElementById(`b${idx}_factor`).value = factor.toFixed(4);
+    guardarCalibracion(idx);
+  } else {
+    alert("Introduce un peso conocido mayor que 0 y asegúrate de haber tarado correctamente la báscula.");
+  }
+}
+function guardarCalibracion(idx) {
+  saveBasculaCalibracion();
+}
+function actualizarBasculas(datos) {
+  let raw = [datos.raw1, datos.raw2, datos.raw3];
+  window.basculaRawLast = raw;
+  for (let i = 0; i < 3; i++) {
+    let offset = basculaCalibracion[i].offset;
+    let factor = basculaCalibracion[i].factor;
+    let kg = ((raw[i] ?? 0) - offset) / factor;
+    document.getElementById(`b${i+1}_val`).textContent = kg.toFixed(2);
+
+    // Historial para gráfica
+    if (!isNaN(kg)) {
+      basculaPesos[i].push(kg);
+      if (basculaPesos[i].length > 60) basculaPesos[i].shift();
     } else {
-      alert("Introduce un peso conocido mayor que 0 y asegúrate de haber tarado correctamente la báscula.");
+      basculaPesos[i].push(null);
+      if (basculaPesos[i].length > 60) basculaPesos[i].shift();
+    }
+    if (basculaCharts[i]) {
+      basculaCharts[i].data.datasets[0].data = basculaPesos[i];
+      basculaCharts[i].update('none');
+    }
+    // --- ACTUALIZA EL EMPUJE DE LA BASCULA 1 PARA EL MOTOR ---
+    if(i === 0) {
+      ultimoThrustN = kg * 9.81;
     }
   }
-  function guardarCalibracion(idx) {
-    saveBasculaCalibracion();
-  }
-  function actualizarBasculas(datos) {
-    let raw = [datos.raw1, datos.raw2, datos.raw3];
-    window.basculaRawLast = raw;
-    for (let i = 0; i < 3; i++) {
-      let offset = basculaCalibracion[i].offset;
-      let factor = basculaCalibracion[i].factor;
-      let kg = ((raw[i] ?? 0) - offset) / factor;
-      document.getElementById(`b${i+1}_val`).textContent = kg.toFixed(2);
-
-      // Historial para gráfica
-      if (!isNaN(kg)) {
-        basculaPesos[i].push(kg);
-        if (basculaPesos[i].length > 60) basculaPesos[i].shift();
-      } else {
-        basculaPesos[i].push(null);
-        if (basculaPesos[i].length > 60) basculaPesos[i].shift();
-      }
-      if (basculaCharts[i]) {
-        basculaCharts[i].data.datasets[0].data = basculaPesos[i];
-        basculaCharts[i].update('none');
-      }
-      // --- ACTUALIZA EL EMPUJE DE LA BASCULA 1 PARA EL MOTOR ---
-      if(i === 0) {
-        ultimoThrustN = kg * 9.81;
-      }
-    }
-  }
-  function initBasculaCharts() {
-    for (let i = 0; i < 3; i++) {
-      let ctx = document.getElementById(`b${i+1}_chart`).getContext('2d');
-      basculaCharts[i] = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: Array(60).fill(""),
-          datasets: [{
-            label: `Báscula ${i+1} (kg)`,
-            data: basculaPesos[i],
-            borderWidth: 2,
-            borderColor: ['#4cf','#fb6','#5f6'][i],
-            backgroundColor: ['#4cf4','#fb62','#5f62'][i],
-            pointRadius: 0,
-            fill: true,
-            tension: 0.15
-          }]
-        },
-        options: {
-          responsive: true,
-          animation: false,
-          maintainAspectRatio: false,
-          scales: {
-            x: { display: false },
-            y: {
-              min: 0,
-              max: 10,
-              ticks: { color: "#fff" },
-              title: { display: true, text: 'kg', color: "#fff" }
-            }
-          },
-          plugins: { legend: { labels: { color: "#fff" } } }
-        }
-      });
-    }
-  }
-
-  // ============================= MOTOR/HORNO/MQTT RESTO =============================
-  function showTab(n) {
-    document.querySelectorAll('.tab').forEach((tab, i) => tab.classList.toggle('active', i===n));
-    document.querySelectorAll('.panel').forEach((panel, i) => panel.classList.toggle('active', i===n));
-  }
-
-  let BROKER = "wss://c77cd5062f0045358d8a48f25befebb3.s1.eu.hivemq.cloud:8884/mqtt";
-  const MQTT_USERNAME = "Marc1234";
-  const MQTT_PASSWORD = "Marc1234";
-  let client = null;
-  const TOPIC_DATOS = "taller/motor/datos";
-  const TOPIC_POTENCIA = "taller/motor/potencia";
-  const TOPIC_BASCULAS = "taller/basculas/datos";
-  const TOPIC_HORNO_DATOS = "taller/horno/datos";
-  const TOPIC_HORNO_CMD = "taller/horno/consigna";
-  const TOPIC_SERVO = "taller/servo/angulo";
-
-  let logging = false;
-  let logData = [];
-  let logStartTime = null;
-
-  function startLogging() {
-    logging = true;
-    logData = [];
-    logStartTime = Date.now();
-    document.getElementById('startBtn').disabled = true;
-    document.getElementById('stopBtn').disabled = false;
-    document.getElementById('logStatus').textContent = 'Logging...';
-  }
-  function stopLogging() {
-    logging = false;
-    document.getElementById('startBtn').disabled = false;
-    document.getElementById('stopBtn').disabled = true;
-    document.getElementById('logStatus').textContent = 'Generando CSV...';
-    if (logData.length === 0) {
-      document.getElementById('logStatus').textContent = 'Sin datos que guardar.';
-      return;
-    }
-    const sep = ";";
-    let csv = ["segundos", "corriente", "thrust", "pwm_pct"].join(sep) + "\n";
-    for (const row of logData) {
-      csv += row.join(sep) + "\n";
-    }
-    const blob = new Blob([csv], {type: 'text/csv'});
-    let name = document.getElementById('logFileName').value.replace(/[^a-zA-Z0-9_\-]/g, "_");
-    if(!name) name = "log";
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name + ".csv";
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      document.getElementById('logStatus').textContent = 'Descarga completada.';
-    }, 100);
-  }
-  function onSliderChange(value) {
-    const val = Number(value);
-    document.getElementById('pot_input').value = val;
-    enviarPotencia(val);
-  }
-  function onInputChange(value) {
-    let val = Number(value);
-    if (isNaN(val)) val = 0;
-    if (val < 0) val = 0;
-    if (val > 100) val = 100;
-    document.getElementById('pot_slider').value = val;
-    enviarPotencia(val);
-  }
-  function enviarPotencia(val) {
-    if (client && client.connected) {
-      client.publish(TOPIC_POTENCIA, val.toString());
-      //console.log("Enviado PWM:", val);
-    }
-  }
-
-  // ========= HORNO =========
-  const HORNO_DT = 0.25;
-  let hornoCurvaConsigna = [];
-  let hornoCurvaReal = [];
-  let hornoLabels = [];
-  let hornoTtotal = 0;
-  let hornoChart = null;
-  let hornoCicloActivo = false;
-  let hornoTempMaxActual = 150;
-  let hornoTempIni = null;
-  function saveHornoState() {
-    const state = {
-      hornoCurvaConsigna,
-      hornoCurvaReal,
-      hornoLabels,
-      hornoTempIni,
-      hornoTtotal,
-      hornoCicloActivo,
-      hornoTempMaxActual
-    };
-    localStorage.setItem('hornoState', JSON.stringify(state));
-  }
-  function loadHornoState() {
-    const saved = localStorage.getItem('hornoState');
-    if (saved) {
-      try {
-        const state = JSON.parse(saved);
-        hornoCurvaConsigna = state.hornoCurvaConsigna || [];
-        hornoCurvaReal = state.hornoCurvaReal || [];
-        hornoLabels = state.hornoLabels || [];
-        hornoTempIni = state.hornoTempIni || null;
-        hornoTtotal = state.hornoTtotal || 0;
-        hornoCicloActivo = state.hornoCicloActivo || false;
-        hornoTempMaxActual = state.hornoTempMaxActual || 150;
-        if(hornoCurvaConsigna.length > 0 && hornoLabels.length > 0) {
-          setTimeout(hornoInitChart, 100);
-        }
-      } catch(e) { console.log("Error al cargar estado horno:", e); }
-    }
-  }
-  function clearHornoState() {
-    localStorage.removeItem('hornoState');
-  }
-  function showEstado(estado) {
-    const est = document.getElementById("horno_estado");
-    est.className = "";
-    if (estado === "subida" || estado === "hold" || estado === "bajada" || estado === "reanudar") {
-      est.classList.add("en-marcha");
-      est.textContent = "EN MARCHA";
-    } else if (estado === "pausa" || estado === "pausado") {
-      est.classList.add("pausado");
-      est.textContent = "PAUSADO";
-    } else {
-      est.classList.add("parado");
-      est.textContent = "PARADO";
-    }
-  }
-  function generarCurvaHorno(tempMax, rampUp, hold, rampDown, t_ini = 25) {
-    let curva = [], tiempos = [];
-    let dt = HORNO_DT, cur_temp = t_ini, t = 0;
-    let tUp = (tempMax - t_ini) / rampUp * 60, tHold = hold * 60, tDown = (tempMax - t_ini) / rampDown * 60;
-    let tTotal = tUp + tHold + tDown;
-    let pasosUp = Math.round(tUp / dt);
-    for (let i = 0; i < pasosUp; ++i, t += dt) {
-      cur_temp += rampUp / 60 * dt;
-      curva.push(cur_temp); tiempos.push(t);
-    }
-    for (let i = 0; i < Math.round(tHold / dt); ++i, t += dt) {
-      curva.push(tempMax); tiempos.push(t);
-    }
-    for (let i = 0; i < Math.round(tDown / dt); ++i, t += dt) {
-      tempMax -= rampDown / 60 * dt;
-      curva.push(tempMax); tiempos.push(t);
-    }
-    hornoLabels = tiempos.map(v => (v / 60).toFixed(2));
-    hornoCurvaConsigna = curva;
-    hornoCurvaReal = Array(curva.length).fill(null);
-    hornoTtotal = Math.round(tTotal);
-    hornoCicloActivo = true;
-    hornoTempMaxActual = Math.max(...curva);
-    saveHornoState();
-  }
-  function hornoInitChart() {
-    if (hornoChart) hornoChart.destroy();
-    const ctx = document.getElementById('hornoChart').getContext('2d');
-    hornoChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: hornoLabels,
-        datasets: [
-          { label: 'Consigna (°C)', data: hornoCurvaConsigna, borderWidth: 2, borderColor: '#44f', backgroundColor: '#44f4', pointRadius: 0, fill: false, tension: 0.1 },
-          { label: 'Temperatura real (°C)', data: hornoCurvaReal, borderWidth: 5, borderColor: '#f44', backgroundColor: '#f442', pointRadius: 0, fill: false, tension: 0.1 }
-        ]
-      },
-      options: {
-        responsive: true,
-        animation: false,
-        maintainAspectRatio: false,
-        scales: {
-          x: { display: true, title: {display: true, text: "Tiempo (min)", color:"#fff"}, ticks: {color:"#fff"} },
-          y: { min: 0, max: Math.ceil(hornoTempMaxActual*1.5), ticks: { color: "#fff" }, title: { display: true, text: '°C', color: "#fff" } }
-        },
-        plugins: { legend: { labels: { color: "#fff" } } }
-      }
-    });
-  }
-  function iniciarHorno() {
-    if (hornoTempIni === null) {
-      alert("Esperando la temperatura inicial del horno...");
-      return;
-    }
-    let tmax = Number(document.getElementById('horno_tmax').value);
-    let rampUp = Number(document.getElementById('horno_ramp_up').value);
-    let hold = Number(document.getElementById('horno_hold').value);
-    let rampDown = Number(document.getElementById('horno_ramp_down').value);
-    generarCurvaHorno(tmax, rampUp, hold, rampDown, hornoTempIni);
-    setTimeout(hornoInitChart, 250);
-    let msg = {
-      cmd: "start",
-      t_ini: hornoTempIni,
-      t_max: tmax,
-      ramp_up: rampUp,
-      hold: hold,
-      ramp_down: rampDown
-    };
-    client.publish(TOPIC_HORNO_CMD, JSON.stringify(msg));
-    saveHornoState();
-  }
-  function hornoUpdateCharts(datos) {
-    if (!hornoCicloActivo || hornoCurvaReal.length === 0 || typeof datos.t_elapsed === "undefined") return;
-    let idx = Math.round((datos.t_elapsed || 0) / HORNO_DT);
-    idx = Math.max(0, Math.min(idx, hornoCurvaReal.length - 1));
-    hornoCurvaReal[idx] = datos.temp ?? null;
-    if (idx > 0 && hornoCurvaReal[idx-1] == null && datos.temp != null) {
-      hornoCurvaReal[idx-1] = datos.temp;
-    }
-    if (hornoChart) {
-      hornoChart.data.datasets[1].data = hornoCurvaReal;
-      hornoChart.update('none');
-    }
-    showEstado(datos.fase || "parado");
-    saveHornoState();
-  }
-  function pausarHorno() { client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "pause"})); }
-  function reanudarHorno() { client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "resume"})); }
-  function pararHorno() {
-    client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "stop"}));
-    hornoTempIni = null;
-    clearHornoState();
-  }
-  function conectarMQTT() {
-    if (client) client.end(true);
-    client = mqtt.connect(BROKER, {
-      username: MQTT_USERNAME,
-      password: MQTT_PASSWORD
-    });
-    client.on('connect', () => {
-      document.getElementById('status').textContent = "MQTT conectado";
-      client.subscribe(TOPIC_DATOS);
-      client.subscribe(TOPIC_BASCULAS);
-      client.subscribe(TOPIC_HORNO_DATOS);
-      client.subscribe(TOPIC_SERVO); // Nueva suscripción
-    });
-    client.on('reconnect', () => { document.getElementById('status').textContent = "Reconectando..."; });
-    client.on('offline', () => { document.getElementById('status').textContent = "MQTT desconectado"; });
-    client.on('error', err => { document.getElementById('status').textContent = 'Error: ' + err; });
-    client.on('message', (topic, message) => {
-      // MOTOR
-      if(topic === TOPIC_DATOS) {
-        try {
-          const datos = JSON.parse(message);
-          document.getElementById('corriente').textContent = datos.corriente ?? '--';
-          document.getElementById('potencia').textContent = datos.potencia_pct ?? '--';
-          document.getElementById('pwmus').textContent = datos.pwm_us ?? '--';
-          document.getElementById('pot_esp').textContent = datos.potencia_pct ?? '--';
-          // Mostrar el empuje calibrado de la bascula 1
-          document.getElementById('thrust').textContent = 
-            (typeof ultimoThrustN === "number" && !isNaN(ultimoThrustN)) ? ultimoThrustN.toFixed(2) : "--";
-          let thrustVal = ultimoThrustN;
-          if (!isNaN(datos.corriente) && !isNaN(thrustVal)) {
-            updateCharts(Number(datos.corriente), Number(thrustVal));
-          }
-          if (logging) {
-            const t = ((Date.now() - logStartTime) / 1000).toFixed(2);
-            const corriente = (typeof datos.corriente === 'number') ? datos.corriente : "";
-            const pwm = (typeof datos.potencia_pct === 'number') ? datos.potencia_pct : "";
-            logData.push([t, corriente, thrustVal, pwm]);
-            document.getElementById('logStatus').textContent = `Logging... (${logData.length} muestras)`;
-          }
-        } catch (e) {
-          document.getElementById('status').textContent = "Error en datos MQTT (motor)";
-        }
-      }
-      // BASCULAS
-      if(topic === TOPIC_BASCULAS) {
-        try {
-          const datos = JSON.parse(message);
-          actualizarBasculas(datos);
-        } catch (e) {
-          document.getElementById('status').textContent = "Error en datos MQTT (bascula)";
-        }
-      }
-      // HORNO
-      if(topic === TOPIC_HORNO_DATOS) {
-        try {
-          const datos = JSON.parse(message);
-          document.getElementById('horno_temp').textContent = datos.temp ?? "--";
-          document.getElementById('horno_setpoint').textContent = datos.setpoint ?? "--";
-          document.getElementById('horno_fase').textContent = datos.fase ?? "--";
-          document.getElementById('horno_ssr1').textContent = datos.ssr1_duty ?? "--";
-          document.getElementById('horno_ssr2').textContent = datos.ssr2_duty ?? "--";
-          document.getElementById('horno_t_elapsed').textContent = ((datos.t_elapsed ?? 0)/60).toFixed(2);
-          document.getElementById('horno_t_total').textContent = ((datos.t_total ?? 0)/60).toFixed(2);
-          if (hornoTempIni === null && typeof datos.temp === "number") {
-            hornoTempIni = datos.temp;
-            saveHornoState();
-          }
-          hornoUpdateCharts(datos);
-        } catch (e) {}
-      }
-    });
-  }
-  // Gráficas Motor
-  const N = 60;
-  const corrienteChart = new Chart(document.getElementById('corrienteChart').getContext('2d'), {
-    type: 'line',
-    data: {
-      labels: Array(N).fill(""),
-      datasets: [{
-        label: 'Corriente (A)',
-        data: Array(N).fill(null),
-        borderWidth: 2,
-        borderColor: '#4cf',
-        backgroundColor: '#4cf4',
-        pointRadius: 0,
-        fill: true,
-        tension: 0.25
-      }]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      maintainAspectRatio: false,
-      scales: {
-        x: { display: false },
-        y: { min: 0, max: 60, ticks: { color: "#fff" }, title: { display: true, text: 'A', color: "#fff" } }
-      },
-      plugins: { legend: { labels: { color: "#fff" } } }
-    }
-  });
-  const thrustChart = new Chart(document.getElementById('thrustChart').getContext('2d'), {
-    type: 'line',
-    data: {
-      labels: Array(N).fill(""),
-      datasets: [{
-        label: 'Thrust (N)',
-        data: Array(N).fill(null),
-        borderWidth: 2,
-        borderColor: '#fb6',
-        backgroundColor: '#fb62',
-        pointRadius: 0,
-        fill: true,
-        tension: 0.25
-      }]
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      maintainAspectRatio: false,
-      scales: {
-        x: { display: false },
-        y: { min: 0, max: 100, ticks: { color: "#fff" }, title: { display: true, text: 'N', color: "#fff" } }
-      },
-      plugins: { legend: { labels: { color: "#fff" } } }
-    }
-  });
-  function updateCharts(corriente, thrustN) {
-    let dataC = corrienteChart.data.datasets[0].data;
-    dataC.push(corriente);
-    if (dataC.length > N) dataC.shift();
-    corrienteChart.update('none');
-    let dataT = thrustChart.data.datasets[0].data;
-    dataT.push(thrustN);
-    if (dataT.length > N) dataT.shift();
-    thrustChart.update('none');
-  }
-
-  // === SERVO/ESC TAB - NUEVO JS ===
-  let servo_angle = 0;
-  let servoSeq = [];
-  let servoSeqTimer = null;
-  let servoSeqPlaying = false;
-  let esc_pwm = 0;
-  let servoChart, escChart;
-  let servoHistory = Array(60).fill(0);
-  let escHistory = Array(60).fill(0);
-
-  function onServoSlider(val) {
-    val = Number(val);
-    document.getElementById('servo_input').value = val;
-    servo_angle = val;
-    document.getElementById('servo_estado').textContent = val;
-    enviarServo(val);
-    addServoHistory(val);
-  }
-  function onServoInput(val) {
-    val = Number(val);
-    if (isNaN(val)) val = 0;
-    if (val < 0) val = 0;
-    if (val > 90) val = 90;
-    document.getElementById('servo_slider').value = val;
-    servo_angle = val;
-    document.getElementById('servo_estado').textContent = val;
-    enviarServo(val);
-    addServoHistory(val);
-  }
-  function centrarServo() {
-    servo_angle = 45;
-    document.getElementById('servo_slider').value = 45;
-    document.getElementById('servo_input').value = 45;
-    document.getElementById('servo_estado').textContent = 45;
-    enviarServo(45);
-    addServoHistory(45);
-  }
-  function enviarServo(val) {
-    if (client && client.connected) {
-      client.publish(TOPIC_SERVO, String(val));
-    }
-  }
-  // ESC CONTROLS
-  function onESCSlider(val) {
-    val = Number(val);
-    document.getElementById('esc_input').value = val;
-    esc_pwm = val;
-    document.getElementById('esc_estado').textContent = val;
-    enviarPotencia(val);
-    addESCHistory(val);
-  }
-  function onESCInput(val) {
-    val = Number(val);
-    if (isNaN(val)) val = 0;
-    if (val < 0) val = 0;
-    if (val > 100) val = 100;
-    document.getElementById('esc_slider').value = val;
-    esc_pwm = val;
-    document.getElementById('esc_estado').textContent = val;
-    enviarPotencia(val);
-    addESCHistory(val);
-  }
-  // ----------- Secuencia de pasos Servo ----------
-  function addSecuenciaPaso() {
-    servoSeq.push({angle: 45, t: 1});
-    renderSecuencia();
-  }
-  function renderSecuencia() {
-    let div = document.getElementById('secuencia_lista');
-    div.innerHTML = '';
-    servoSeq.forEach((p, idx) => {
-      let pasoDiv = document.createElement('div');
-      pasoDiv.className = 'paso';
-      pasoDiv.innerHTML = `
-        <span>Paso ${idx+1}:</span>
-        <label>Ángulo <input type="number" value="${p.angle}" min="0" max="90" step="1"
-          onchange="editSeqAngle(${idx}, this.value)"></label>
-        <label>Tiempo <input type="number" value="${p.t}" min="0.05" max="30" step="0.05"
-          onchange="editSeqTime(${idx}, this.value)"> s</label>
-        <button onclick="delSecuenciaPaso(${idx})" style="background:#a33;">X</button>
-      `;
-      div.appendChild(pasoDiv);
-    });
-  }
-  function editSeqAngle(idx, val) {
-    val = Number(val);
-    if (val < 0) val = 0; if (val > 90) val = 90;
-    servoSeq[idx].angle = val;
-    renderSecuencia();
-  }
-  function editSeqTime(idx, val) {
-    val = Number(val);
-    if (val < 0.05) val = 0.05;
-    servoSeq[idx].t = val;
-    renderSecuencia();
-  }
-  function delSecuenciaPaso(idx) {
-    servoSeq.splice(idx, 1);
-    renderSecuencia();
-  }
-  function limpiarSecuencia() {
-    servoSeq = [];
-    renderSecuencia();
-  }
-  function playSecuencia() {
-    if (servoSeq.length === 0) return;
-    pararSecuencia();
-    let velocidad = Number(document.getElementById('servo_seq_vel').value) || 1.0;
-    let paso = 0;
-    servoSeqPlaying = true;
-    function doStep() {
-      if (!servoSeqPlaying || paso >= servoSeq.length) { servoSeqPlaying = false; return; }
-      let ang = servoSeq[paso].angle;
-      let t = servoSeq[paso].t * velocidad;
-      servo_angle = ang;
-      document.getElementById('servo_slider').value = ang;
-      document.getElementById('servo_input').value = ang;
-      document.getElementById('servo_estado').textContent = ang;
-      enviarServo(ang);
-      addServoHistory(ang);
-      paso++;
-      servoSeqTimer = setTimeout(doStep, t * 1000);
-    }
-    doStep();
-  }
-  function pararSecuencia() {
-    servoSeqPlaying = false;
-    if (servoSeqTimer) clearTimeout(servoSeqTimer);
-    servoSeqTimer = null;
-  }
-  // ----- Gráficas Servo y ESC -----
-  function addServoHistory(val) {
-    servoHistory.push(val);
-    if (servoHistory.length > 60) servoHistory.shift();
-    if (servoChart) {
-      servoChart.data.datasets[0].data = servoHistory;
-      servoChart.update('none');
-    }
-  }
-  function addESCHistory(val) {
-    escHistory.push(val);
-    if (escHistory.length > 60) escHistory.shift();
-    if (escChart) {
-      escChart.data.datasets[0].data = escHistory;
-      escChart.update('none');
-    }
-  }
-  function initServoESCCharts() {
-    let ctx1 = document.getElementById('servoChart').getContext('2d');
-    servoChart = new Chart(ctx1, {
+}
+function initBasculaCharts() {
+  for (let i = 0; i < 3; i++) {
+    let ctx = document.getElementById(`b${i+1}_chart`).getContext('2d');
+    basculaCharts[i] = new Chart(ctx, {
       type: 'line',
       data: {
         labels: Array(60).fill(""),
         datasets: [{
-          label: 'Ángulo Servo (°)',
-          data: servoHistory,
+          label: `Báscula ${i+1} (kg)`,
+          data: basculaPesos[i],
           borderWidth: 2,
-          borderColor: '#f8f',
-          backgroundColor: '#f8f2',
+          borderColor: ['#4cf','#fb6','#5f6'][i],
+          backgroundColor: ['#4cf4','#fb62','#5f62'][i],
           pointRadius: 0,
           fill: true,
-          tension: 0.2
+          tension: 0.15
         }]
       },
       options: {
@@ -970,48 +397,496 @@
         maintainAspectRatio: false,
         scales: {
           x: { display: false },
-          y: { min: 0, max: 90, ticks: { color: "#fff" }, title: { display: true, text: '°', color: "#fff" } }
-        },
-        plugins: { legend: { labels: { color: "#fff" } } }
-      }
-    });
-    let ctx2 = document.getElementById('escChart').getContext('2d');
-    escChart = new Chart(ctx2, {
-      type: 'line',
-      data: {
-        labels: Array(60).fill(""),
-        datasets: [{
-          label: 'PWM ESC (%)',
-          data: escHistory,
-          borderWidth: 2,
-          borderColor: '#8ff',
-          backgroundColor: '#8ff2',
-          pointRadius: 0,
-          fill: true,
-          tension: 0.2
-        }]
-      },
-      options: {
-        responsive: true,
-        animation: false,
-        maintainAspectRatio: false,
-        scales: {
-          x: { display: false },
-          y: { min: 0, max: 100, ticks: { color: "#fff" }, title: { display: true, text: '%', color: "#fff" } }
+          y: {
+            min: 0,
+            max: 10,
+            ticks: { color: "#fff" },
+            title: { display: true, text: 'kg', color: "#fff" }
+          }
         },
         plugins: { legend: { labels: { color: "#fff" } } }
       }
     });
   }
-  // ----- Hook de inicio global -----
-  window.onload = function() {
-    loadBasculaCalibracion();
-    initBasculaCharts();
-    conectarMQTT();
-    loadHornoState();
-    initServoESCCharts();
-    renderSecuencia();
+}
+
+// ========== MOTOR ==========
+let BROKER = "wss://c77cd5062f0045358d8a48f25befebb3.s1.eu.hivemq.cloud:8884/mqtt";
+const MQTT_USERNAME = "Marc1234";
+const MQTT_PASSWORD = "Marc1234";
+let client = null;
+const TOPIC_DATOS = "taller/motor/datos";
+const TOPIC_POTENCIA = "taller/motor/potencia";
+const TOPIC_BASCULAS = "taller/basculas/datos";
+const TOPIC_HORNO_DATOS = "taller/horno/datos";
+const TOPIC_HORNO_CMD = "taller/horno/consigna";
+const TOPIC_SERVO = "taller/servo/angulo";
+const TOPIC_ESC = "taller/motor/potencia";
+
+let logging = false;
+let logData = [];
+let logStartTime = null;
+
+function startLogging() {
+  logging = true;
+  logData = [];
+  logStartTime = Date.now();
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+  document.getElementById('logStatus').textContent = 'Logging...';
+}
+function stopLogging() {
+  logging = false;
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = true;
+  document.getElementById('logStatus').textContent = 'Generando CSV...';
+  if (logData.length === 0) {
+    document.getElementById('logStatus').textContent = 'Sin datos que guardar.';
+    return;
+  }
+  const sep = ";";
+  let csv = ["segundos", "corriente", "thrust", "pwm_pct"].join(sep) + "\n";
+  for (const row of logData) {
+    csv += row.join(sep) + "\n";
+  }
+  const blob = new Blob([csv], {type: 'text/csv'});
+  let name = document.getElementById('logFileName').value.replace(/[^a-zA-Z0-9_\-]/g, "_");
+  if(!name) name = "log";
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    document.getElementById('logStatus').textContent = 'Descarga completada.';
+  }, 100);
+}
+function onSliderChange(value) {
+  const val = Number(value);
+  document.getElementById('pot_input').value = val;
+  enviarPotencia(val);
+}
+function onInputChange(value) {
+  let val = Number(value);
+  if (isNaN(val)) val = 0;
+  if (val < 0) val = 0;
+  if (val > 100) val = 100;
+  document.getElementById('pot_slider').value = val;
+  enviarPotencia(val);
+}
+function enviarPotencia(val) {
+  if (client && client.connected) {
+    client.publish(TOPIC_POTENCIA, val.toString());
+    console.log("Enviado PWM:", val);
+  }
+}
+
+// ========== GRÁFICAS MOTOR ==========
+const N = 60;
+const corrienteChart = new Chart(document.getElementById('corrienteChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: Array(N).fill(""),
+    datasets: [{
+      label: 'Corriente (A)',
+      data: Array(N).fill(null),
+      borderWidth: 2,
+      borderColor: '#4cf',
+      backgroundColor: '#4cf4',
+      pointRadius: 0,
+      fill: true,
+      tension: 0.25
+    }]
+  },
+  options: {
+    responsive: true,
+    animation: false,
+    maintainAspectRatio: false,
+    scales: {
+      x: { display: false },
+      y: { min: 0, max: 60, ticks: { color: "#fff" }, title: { display: true, text: 'A', color: "#fff" } }
+    },
+    plugins: { legend: { labels: { color: "#fff" } } }
+  }
+});
+const thrustChart = new Chart(document.getElementById('thrustChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: Array(N).fill(""),
+    datasets: [{
+      label: 'Thrust (N)',
+      data: Array(N).fill(null),
+      borderWidth: 2,
+      borderColor: '#fb6',
+      backgroundColor: '#fb62',
+      pointRadius: 0,
+      fill: true,
+      tension: 0.25
+    }]
+  },
+  options: {
+    responsive: true,
+    animation: false,
+    maintainAspectRatio: false,
+    scales: {
+      x: { display: false },
+      y: { min: 0, max: 100, ticks: { color: "#fff" }, title: { display: true, text: 'N', color: "#fff" } }
+    },
+    plugins: { legend: { labels: { color: "#fff" } } }
+  }
+});
+function updateCharts(corriente, thrustN) {
+  let dataC = corrienteChart.data.datasets[0].data;
+  dataC.push(corriente);
+  if (dataC.length > N) dataC.shift();
+  corrienteChart.update('none');
+  let dataT = thrustChart.data.datasets[0].data;
+  dataT.push(thrustN);
+  if (dataT.length > N) dataT.shift();
+  thrustChart.update('none');
+}
+
+// ========== HORNO ==========
+const HORNO_DT = 0.25;
+let hornoCurvaConsigna = [];
+let hornoCurvaReal = [];
+let hornoLabels = [];
+let hornoTtotal = 0;
+let hornoChart = null;
+let hornoCicloActivo = false;
+let hornoTempMaxActual = 150;
+let hornoTempIni = null;
+function saveHornoState() {
+  const state = {
+    hornoCurvaConsigna,
+    hornoCurvaReal,
+    hornoLabels,
+    hornoTempIni,
+    hornoTtotal,
+    hornoCicloActivo,
+    hornoTempMaxActual
   };
+  localStorage.setItem('hornoState', JSON.stringify(state));
+}
+function loadHornoState() {
+  const saved = localStorage.getItem('hornoState');
+  if (saved) {
+    try {
+      const state = JSON.parse(saved);
+      hornoCurvaConsigna = state.hornoCurvaConsigna || [];
+      hornoCurvaReal = state.hornoCurvaReal || [];
+      hornoLabels = state.hornoLabels || [];
+      hornoTempIni = state.hornoTempIni || null;
+      hornoTtotal = state.hornoTtotal || 0;
+      hornoCicloActivo = state.hornoCicloActivo || false;
+      hornoTempMaxActual = state.hornoTempMaxActual || 150;
+      if(hornoCurvaConsigna.length > 0 && hornoLabels.length > 0) {
+        setTimeout(hornoInitChart, 100);
+      }
+    } catch(e) { console.log("Error al cargar estado horno:", e); }
+  }
+}
+function clearHornoState() {
+  localStorage.removeItem('hornoState');
+}
+function showEstado(estado) {
+  const est = document.getElementById("horno_estado");
+  est.className = "";
+  if (estado === "subida" || estado === "hold" || estado === "bajada" || estado === "reanudar") {
+    est.classList.add("en-marcha");
+    est.textContent = "EN MARCHA";
+  } else if (estado === "pausa" || estado === "pausado") {
+    est.classList.add("pausado");
+    est.textContent = "PAUSADO";
+  } else {
+    est.classList.add("parado");
+    est.textContent = "PARADO";
+  }
+}
+function generarCurvaHorno(tempMax, rampUp, hold, rampDown, t_ini = 25) {
+  let curva = [], tiempos = [];
+  let dt = HORNO_DT, cur_temp = t_ini, t = 0;
+  let tUp = (tempMax - t_ini) / rampUp * 60, tHold = hold * 60, tDown = (tempMax - t_ini) / rampDown * 60;
+  let tTotal = tUp + tHold + tDown;
+  let pasosUp = Math.round(tUp / dt);
+  for (let i = 0; i < pasosUp; ++i, t += dt) {
+    cur_temp += rampUp / 60 * dt;
+    curva.push(cur_temp); tiempos.push(t);
+  }
+  for (let i = 0; i < Math.round(tHold / dt); ++i, t += dt) {
+    curva.push(tempMax); tiempos.push(t);
+  }
+  for (let i = 0; i < Math.round(tDown / dt); ++i, t += dt) {
+    tempMax -= rampDown / 60 * dt;
+    curva.push(tempMax); tiempos.push(t);
+  }
+  hornoLabels = tiempos.map(v => (v / 60).toFixed(2));
+  hornoCurvaConsigna = curva;
+  hornoCurvaReal = Array(curva.length).fill(null);
+  hornoTtotal = Math.round(tTotal);
+  hornoCicloActivo = true;
+  hornoTempMaxActual = Math.max(...curva);
+  saveHornoState();
+}
+function hornoInitChart() {
+  if (hornoChart) hornoChart.destroy();
+  const ctx = document.getElementById('hornoChart').getContext('2d');
+  hornoChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: hornoLabels,
+      datasets: [
+        { label: 'Consigna (°C)', data: hornoCurvaConsigna, borderWidth: 2, borderColor: '#44f', backgroundColor: '#44f4', pointRadius: 0, fill: false, tension: 0.1 },
+        { label: 'Temperatura real (°C)', data: hornoCurvaReal, borderWidth: 5, borderColor: '#f44', backgroundColor: '#f442', pointRadius: 0, fill: false, tension: 0.1 }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      maintainAspectRatio: false,
+      scales: {
+        x: { display: true, title: {display: true, text: "Tiempo (min)", color:"#fff"}, ticks: {color:"#fff"} },
+        y: { min: 0, max: Math.ceil(hornoTempMaxActual*1.5), ticks: { color: "#fff" }, title: { display: true, text: '°C', color: "#fff" } }
+      },
+      plugins: { legend: { labels: { color: "#fff" } } }
+    }
+  });
+}
+function iniciarHorno() {
+  if (hornoTempIni === null) {
+    alert("Esperando la temperatura inicial del horno...");
+    return;
+  }
+  let tmax = Number(document.getElementById('horno_tmax').value);
+  let rampUp = Number(document.getElementById('horno_ramp_up').value);
+  let hold = Number(document.getElementById('horno_hold').value);
+  let rampDown = Number(document.getElementById('horno_ramp_down').value);
+  generarCurvaHorno(tmax, rampUp, hold, rampDown, hornoTempIni);
+  setTimeout(hornoInitChart, 250);
+  let msg = {
+    cmd: "start",
+    t_ini: hornoTempIni,
+    t_max: tmax,
+    ramp_up: rampUp,
+    hold: hold,
+    ramp_down: rampDown
+  };
+  client.publish(TOPIC_HORNO_CMD, JSON.stringify(msg));
+  saveHornoState();
+}
+function hornoUpdateCharts(datos) {
+  if (!hornoCicloActivo || hornoCurvaReal.length === 0 || typeof datos.t_elapsed === "undefined") return;
+  let idx = Math.round((datos.t_elapsed || 0) / HORNO_DT);
+  idx = Math.max(0, Math.min(idx, hornoCurvaReal.length - 1));
+  hornoCurvaReal[idx] = datos.temp ?? null;
+  if (idx > 0 && hornoCurvaReal[idx-1] == null && datos.temp != null) {
+    hornoCurvaReal[idx-1] = datos.temp;
+  }
+  if (hornoChart) {
+    hornoChart.data.datasets[1].data = hornoCurvaReal;
+    hornoChart.update('none');
+  }
+  showEstado(datos.fase || "parado");
+  saveHornoState();
+}
+function pausarHorno() { client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "pause"})); }
+function reanudarHorno() { client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "resume"})); }
+function pararHorno() {
+  client.publish(TOPIC_HORNO_CMD, JSON.stringify({cmd: "stop"}));
+  hornoTempIni = null;
+  clearHornoState();
+}
+
+// ========== SERVO Y ESC ==========
+let servo_angle = 90;
+let esc_pwm = 0;
+let secuenciaActiva = false;
+
+function onServoSlider(val) {
+  val = Number(val);
+  document.getElementById('servo_input').value = val;
+  servo_angle = val;
+  document.getElementById('servo_estado').textContent = val;
+  enviarServo(val);
+}
+function onServoInput(val) {
+  val = Number(val);
+  if (isNaN(val)) val = 0;
+  if (val < 0) val = 0;
+  if (val > 90) val = 90;
+  document.getElementById('servo_slider').value = val;
+  servo_angle = val;
+  document.getElementById('servo_estado').textContent = val;
+  enviarServo(val);
+}
+function enviarServo(val) {
+  if (client && client.connected) {
+    client.publish(TOPIC_SERVO, val.toString());
+  }
+}
+function secuenciaServo() {
+  if (secuenciaActiva) return;
+  secuenciaActiva = true;
+  let secuencia = [0,30,60,90,45,10,80,0,90];
+  let i = 0;
+  function next() {
+    if (i >= secuencia.length) {
+      secuenciaActiva = false;
+      return;
+    }
+    servo_angle = secuencia[i];
+    document.getElementById('servo_slider').value = servo_angle;
+    document.getElementById('servo_input').value = servo_angle;
+    document.getElementById('servo_estado').textContent = servo_angle;
+    enviarServo(servo_angle);
+    i++;
+    setTimeout(next, 900);
+  }
+  next();
+}
+function setServo90() {
+  servo_angle = 90;
+  document.getElementById('servo_slider').value = 90;
+  document.getElementById('servo_input').value = 90;
+  document.getElementById('servo_estado').textContent = 90;
+  enviarServo(90);
+}
+function setServo0() {
+  servo_angle = 0;
+  document.getElementById('servo_slider').value = 0;
+  document.getElementById('servo_input').value = 0;
+  document.getElementById('servo_estado').textContent = 0;
+  enviarServo(0);
+}
+function onEscSlider(val) {
+  val = Number(val);
+  document.getElementById('esc_input').value = val;
+  esc_pwm = val;
+  document.getElementById('esc_estado').textContent = val;
+  enviarESC(val);
+}
+function onEscInput(val) {
+  val = Number(val);
+  if (isNaN(val)) val = 0;
+  if (val < 0) val = 0;
+  if (val > 100) val = 100;
+  document.getElementById('esc_slider').value = val;
+  esc_pwm = val;
+  document.getElementById('esc_estado').textContent = val;
+  enviarESC(val);
+}
+function enviarESC(val) {
+  if (client && client.connected) {
+    client.publish(TOPIC_ESC, val.toString());
+  }
+}
+function setESC0() {
+  esc_pwm = 0;
+  document.getElementById('esc_slider').value = 0;
+  document.getElementById('esc_input').value = 0;
+  document.getElementById('esc_estado').textContent = 0;
+  enviarESC(0);
+}
+
+// ========== MQTT Y MENSAJES ==========
+function conectarMQTT() {
+  if (client) client.end(true);
+
+  client = mqtt.connect(BROKER, {
+    username: MQTT_USERNAME,
+    password: MQTT_PASSWORD
+  });
+
+  client.on('connect', () => {
+    document.getElementById('status').textContent = "MQTT conectado";
+    client.subscribe(TOPIC_DATOS);
+    client.subscribe(TOPIC_BASCULAS);
+    client.subscribe(TOPIC_HORNO_DATOS);
+    client.subscribe(TOPIC_SERVO);
+  });
+  client.on('reconnect', () => { document.getElementById('status').textContent = "Reconectando..."; });
+  client.on('offline', () => { document.getElementById('status').textContent = "MQTT desconectado"; });
+  client.on('error', err => { document.getElementById('status').textContent = 'Error: ' + err; });
+  client.on('message', (topic, message) => {
+    // MOTOR
+    if(topic === TOPIC_DATOS) {
+      try {
+        const datos = JSON.parse(message);
+        document.getElementById('corriente').textContent = datos.corriente ?? '--';
+        document.getElementById('potencia').textContent = datos.potencia_pct ?? '--';
+        document.getElementById('pwmus').textContent = datos.pwm_us ?? '--';
+        document.getElementById('pot_esp').textContent = datos.potencia_pct ?? '--';
+        document.getElementById('thrust').textContent = 
+          (typeof ultimoThrustN === "number" && !isNaN(ultimoThrustN)) ? ultimoThrustN.toFixed(2) : "--";
+        let thrustVal = ultimoThrustN;
+        if (!isNaN(datos.corriente) && !isNaN(thrustVal)) {
+          updateCharts(Number(datos.corriente), Number(thrustVal));
+        }
+        if (logging) {
+          const t = ((Date.now() - logStartTime) / 1000).toFixed(2);
+          const corriente = (typeof datos.corriente === 'number') ? datos.corriente : "";
+          const pwm = (typeof datos.potencia_pct === 'number') ? datos.potencia_pct : "";
+          logData.push([t, corriente, thrustVal, pwm]);
+          document.getElementById('logStatus').textContent = `Logging... (${logData.length} muestras)`;
+        }
+      } catch (e) {
+        document.getElementById('status').textContent = "Error en datos MQTT (motor)";
+      }
+    }
+    // BASCULAS
+    if(topic === TOPIC_BASCULAS) {
+      try {
+        const datos = JSON.parse(message);
+        actualizarBasculas(datos);
+      } catch (e) {
+        document.getElementById('status').textContent = "Error en datos MQTT (bascula)";
+      }
+    }
+    // HORNO
+    if(topic === TOPIC_HORNO_DATOS) {
+      try {
+        const datos = JSON.parse(message);
+        document.getElementById('horno_temp').textContent = datos.temp ?? "--";
+        document.getElementById('horno_setpoint').textContent = datos.setpoint ?? "--";
+        document.getElementById('horno_fase').textContent = datos.fase ?? "--";
+        document.getElementById('horno_ssr1').textContent = datos.ssr1_duty ?? "--";
+        document.getElementById('horno_ssr2').textContent = datos.ssr2_duty ?? "--";
+        document.getElementById('horno_t_elapsed').textContent = ((datos.t_elapsed ?? 0)/60).toFixed(2);
+        document.getElementById('horno_t_total').textContent = ((datos.t_total ?? 0)/60).toFixed(2);
+        if (hornoTempIni === null && typeof datos.temp === "number") {
+          hornoTempIni = datos.temp;
+          saveHornoState();
+        }
+        hornoUpdateCharts(datos);
+      } catch (e) {}
+    }
+    // SERVO: solo actúa si quieres recibir feedback, aquí no haces nada extra
+  });
+}
+
+// ==== NAVEGACIÓN DE PESTAÑAS ====
+function showTab(n) {
+  document.querySelectorAll('.tab').forEach((tab, i) => tab.classList.toggle('active', i===n));
+  document.querySelectorAll('.panel').forEach((panel, i) => panel.classList.toggle('active', i===n));
+}
+
+// ==== INICIALIZACIÓN ====
+window.onload = function() {
+  loadBasculaCalibracion();
+  initBasculaCharts();
+  conectarMQTT();
+  loadHornoState();
+
+  document.getElementById('servo_slider').value = 90;
+  document.getElementById('servo_input').value = 90;
+  document.getElementById('servo_estado').textContent = 90;
+  document.getElementById('esc_slider').value = 0;
+  document.getElementById('esc_input').value = 0;
+  document.getElementById('esc_estado').textContent = 0;
+};
 </script>
 </body>
 </html>

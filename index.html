@@ -270,7 +270,6 @@
             <span id="servo_estado" class="value">90</span>°
           </div>
           <div class="fila-campo">
-            <button type="button" onclick="secuenciaServo()">Secuencia demo</button>
             <button type="button" onclick="setServo90()">Ir a 90°</button>
             <button type="button" onclick="setServo0()">Ir a 0°</button>
           </div>
@@ -701,9 +700,9 @@ function pararHorno() {
 }
 
 // ========== SERVO Y ESC ==========
+// MODIFICADO (simplificado, seguro, SIN secuencia)
 let servo_angle = 90;
 let esc_pwm = 0;
-let secuenciaActiva = false;
 
 function onServoSlider(val) {
   val = Number(val);
@@ -727,26 +726,6 @@ function enviarServo(val) {
     client.publish(TOPIC_SERVO, val.toString());
   }
 }
-function secuenciaServo() {
-  if (secuenciaActiva) return;
-  secuenciaActiva = true;
-  let secuencia = [0,30,60,90,45,10,80,0,90];
-  let i = 0;
-  function next() {
-    if (i >= secuencia.length) {
-      secuenciaActiva = false;
-      return;
-    }
-    servo_angle = secuencia[i];
-    document.getElementById('servo_slider').value = servo_angle;
-    document.getElementById('servo_input').value = servo_angle;
-    document.getElementById('servo_estado').textContent = servo_angle;
-    enviarServo(servo_angle);
-    i++;
-    setTimeout(next, 900);
-  }
-  next();
-}
 function setServo90() {
   servo_angle = 90;
   document.getElementById('servo_slider').value = 90;
@@ -761,6 +740,7 @@ function setServo0() {
   document.getElementById('servo_estado').textContent = 0;
   enviarServo(0);
 }
+
 function onEscSlider(val) {
   val = Number(val);
   document.getElementById('esc_input').value = val;
